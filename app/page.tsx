@@ -96,114 +96,15 @@ export default function MunicipalPortalLanding() {
           </div>
         </div>
 
-        {/* 2. HEADER WITH AUTHENTIC TAYTAY SEAL */}
+        {/* 2. HEADER WITH AUTHENTIC UPLOADED TAYTAY SEAL */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm w-full">
           <div className="w-full px-4 sm:px-8 py-3 flex justify-between items-center">
             {/* Left-Aligned Brand Block */}
             <div className="flex items-center space-x-3 text-left">
               <img
-                src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Taytay_Rizal_seal.png/360px-Taytay_Rizal_seal.png"
-                referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
+                src="/IMG_0970.jpeg"
                 alt="Pamahalaang Bayan ng Taytay Official Seal"
                 className="w-12 h-12 object-contain flex-shrink-0 drop-shadow-sm"
               />
               <div>
-                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 leading-tight">
-                  {t.lguSub}
-                </div>
-                <h1 className="text-lg font-black text-slate-950 tracking-tight leading-none mt-0.5">
-                  {t.portalTitle}
-                </h1>
-              </div>
-            </div>
-
-            {/* Right Navigation */}
-            <nav>
-              <a 
-                href="#about" 
-                className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-blue-950 px-3 py-1.5 rounded-md transition hover:bg-slate-100"
-              >
-                {t.aboutNav}
-              </a>
-            </nav>
-          </div>
-        </header>
-
-        {/* 3. HERO INTRO */}
-        <section className="bg-slate-900 text-white py-12 px-4 sm:px-6 text-center border-b border-slate-800">
-          <div className="max-w-xl mx-auto">
-            <div className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold mb-3">
-              {t.heroBadge}
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-2 text-white">
-              {t.heroHeading}
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
-              {t.heroSub}
-            </p>
-          </div>
-        </section>
-
-        {/* 4. COMPACT PORTRAIT RECTANGLE CARD */}
-        <main className="max-w-sm mx-auto px-4 py-8 relative z-10">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center">
-            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl mx-auto mb-3 border border-amber-200">
-              🚨
-            </div>
-
-            <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 mb-2">
-              {t.cardBadge}
-            </span>
-
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">
-              {t.cardTitle}
-            </h3>
-
-            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-              {t.cardDesc}
-            </p>
-
-            {/* 3 Action Steps */}
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 my-4 text-left space-y-1.5 text-xs text-slate-700">
-              <div className="flex items-center gap-2">
-                <span className="text-blue-600 font-bold">✓</span>
-                <span>{t.step1}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-blue-600 font-bold">✓</span>
-                <span>{t.step2}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-blue-600 font-bold">✓</span>
-                <span>{t.step3}</span>
-              </div>
-            </div>
-
-            <button 
-              type="button"
-              className="w-full bg-blue-950 hover:bg-blue-900 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-xs sm:text-sm flex items-center justify-center gap-2"
-            >
-              <span>{t.cardBtn}</span>
-              <span>→</span>
-            </button>
-          </div>
-        </main>
-
-        {/* 5. ABOUT SECTION */}
-        <section id="about" className="max-w-xl mx-auto px-4 py-8 text-center border-t border-slate-200">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">{t.aboutHeading}</h4>
-          <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
-            {t.aboutText}
-          </p>
-        </section>
-      </div>
-
-      {/* 6. MINIMAL FOOTER */}
-      <footer className="bg-slate-950 text-slate-500 py-6 px-4 text-center text-xs border-t border-slate-800">
-        <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS</p>
-        <p className="text-[11px] mt-1">{t.footerText}</p>
-      </footer>
-    </div>
-  );
-}
+                <div className="text-[10px] upp
