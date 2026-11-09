@@ -3,37 +3,6 @@
 
 import React, { useState } from 'react';
 
-// Indestructible Vector Seal for Municipality of Taytay, Rizal
-function TaytayOfficialSeal() {
-  return (
-    <div className="w-11 h-11 relative flex-shrink-0">
-      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
-        {/* Outer Gold Border Ring */}
-        <circle cx="50" cy="50" r="48" fill="#0f172a" stroke="#f59e0b" strokeWidth="4" />
-        <circle cx="50" cy="50" r="42" fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3 2" />
-        
-        {/* Inner Shield (Philippine Blue & Red) */}
-        <path d="M50 15 L78 28 V52 C78 70 50 85 50 85 C50 85 22 70 22 52 V28 Z" fill="#1e3a8a" stroke="#ffffff" strokeWidth="1.5" />
-        <path d="M50 15 L78 28 V52 C78 70 50 85 50 85 V15 Z" fill="#dc2626" />
-        
-        {/* Golden Sun Emblem */}
-        <circle cx="50" cy="42" r="9" fill="#fbbf24" />
-        
-        {/* 3 Golden Stars */}
-        <polygon points="50,22 52,26 56,26 53,29 54,33 50,31 46,33 47,29 44,26 48,26" fill="#fbbf24" />
-        <polygon points="34,36 36,40 40,40 37,43 38,47 34,45 30,47 31,43 28,40 32,40" fill="#fbbf24" />
-        <polygon points="66,36 68,40 72,40 69,43 70,47 66,45 62,47 63,43 60,40 64,40" fill="#fbbf24" />
-        
-        {/* Lower Garment / Loom Weaver Symbol (Taytay's Heritage) */}
-        <path d="M36 60 H64 V68 H36 Z" fill="#f8fafc" stroke="#f59e0b" strokeWidth="1" />
-        <line x1="43" y1="60" x2="43" y2="68" stroke="#0f172a" strokeWidth="1.5" />
-        <line x1="50" y1="60" x2="50" y2="68" stroke="#0f172a" strokeWidth="1.5" />
-        <line x1="57" y1="60" x2="57" y2="68" stroke="#0f172a" strokeWidth="1.5" />
-      </svg>
-    </div>
-  );
-}
-
 export default function MunicipalPortalLanding() {
   const [lang, setLang] = useState<'en' | 'fil'>('en');
 
@@ -99,7 +68,7 @@ export default function MunicipalPortalLanding() {
           <div className="flex items-center space-x-3">
             <span className="hidden md:inline text-slate-400 text-[11px]">{t.complianceTag}</span>
             
-            {/* Language Switcher */}
+            {/* Working Language Switcher */}
             <div className="bg-slate-800 p-0.5 rounded-md border border-slate-700 flex items-center">
               <button
                 type="button"
@@ -127,12 +96,18 @@ export default function MunicipalPortalLanding() {
           </div>
         </div>
 
-        {/* 2. HEADER (FAR-LEFT ALIGNED WITH INDESTRUCTIBLE OFFICIAL EMBLEM) */}
+        {/* 2. HEADER WITH AUTHENTIC TAYTAY SEAL */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm w-full">
           <div className="w-full px-4 sm:px-8 py-3 flex justify-between items-center">
-            {/* Left Brand Block */}
+            {/* Left-Aligned Brand Block */}
             <div className="flex items-center space-x-3 text-left">
-              <TaytayOfficialSeal />
+              <img
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Taytay_Rizal_seal.png/360px-Taytay_Rizal_seal.png"
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                alt="Pamahalaang Bayan ng Taytay Official Seal"
+                className="w-12 h-12 object-contain flex-shrink-0 drop-shadow-sm"
+              />
               <div>
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 leading-tight">
                   {t.lguSub}
@@ -189,7 +164,7 @@ export default function MunicipalPortalLanding() {
               {t.cardDesc}
             </p>
 
-            {/* 3 Simple Action Steps */}
+            {/* 3 Action Steps */}
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 my-4 text-left space-y-1.5 text-xs text-slate-700">
               <div className="flex items-center gap-2">
                 <span className="text-blue-600 font-bold">✓</span>
