@@ -153,15 +153,16 @@ export default function MunicipalPortalLanding() {
               </div>
             </div>
 
-            <button
-              type="button"
+            {/* CONNECTED REPORT BUTTON (DIRECT LINK TO /report) */}
+            <a
+              href="/report"
               className="w-full bg-blue-950 hover:bg-blue-900 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-xs sm:text-sm flex items-center justify-center gap-2"
             >
               <span>
                 {isEn ? "Report a Problem Now" : "Mag-ulat ng Problema Ngayon"}
               </span>
               <span>→</span>
-            </button>
+            </a>
           </div>
         </main>
 
