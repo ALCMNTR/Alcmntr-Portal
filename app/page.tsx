@@ -1,240 +1,202 @@
 // app/page.tsx
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 
 export default function MunicipalPortalLanding() {
+  // English is set as the strict default
+  const [lang, setLang] = useState<'en' | 'fil'>('en');
+
+  // Simple, citizen-friendly bilingual dictionary
+  const content = {
+    en: {
+      statutoryTop: "Official Civic Gateway • Municipality of Taytay, Rizal",
+      complianceTag: "RA 11032 Compliant",
+      lguSub: "Municipal Government of Taytay",
+      portalTitle: "Citizen Portal",
+      aboutNav: "About",
+      heroBadge: "Taytay Municipal Public Services",
+      heroHeading: "Direct Public Service for Taytayeños.",
+      heroSub: "The official municipal gateway to submit community issues directly to local government offices for fast resolution.",
+      
+      // Compact Portrait Card Content
+      cardBadge: "LIVE CITIZEN DISPATCH",
+      cardTitle: "Report a Problem",
+      cardDesc: "Notice a broken streetlight, clogged canal, or uncollected garbage? Take a photo and report it straight to City Hall.",
+      step1: "1. Take a live photo",
+      step2: "2. Pinpoint your location",
+      step3: "3. Receive SMS text updates",
+      cardBtn: "Report a Problem Now",
+      
+      aboutHeading: "About This Platform",
+      aboutText: "Engineered by Alcmntr to provide citizens with a direct, transparent channel to report municipal issues and track resolution in real-time, in full compliance with the Philippine Ease of Doing Business Act.",
+      footerText: "Powered by Alcmntr GovTech Engine. All rights reserved."
+    },
+    fil: {
+      statutoryTop: "Opisyal na Civic Gateway • Bayan ng Taytay, Rizal",
+      complianceTag: "Alinsunod sa RA 11032",
+      lguSub: "Pamahalaang Bayan ng Taytay",
+      portalTitle: "Citizen Portal",
+      aboutNav: "Tungkol sa Amin",
+      heroBadge: "Serbisyong Publiko ng Bayan ng Taytay",
+      heroHeading: "Direktang Serbisyong Publiko sa Taytay.",
+      heroSub: "Ang opisyal na portal ng munisipyo upang maiparating ang mga problema sa komunidad diretso sa kinauukulan para sa agarang aksyon.",
+      
+      // Compact Portrait Card Content
+      cardBadge: "DIREKTONG AKSYON",
+      cardTitle: "Mag-ulat ng Problema",
+      cardDesc: "May sirang ilaw, baradong kanal, o tambak na basura? Kunan ng litrato at i-report agad sa Munisipyo.",
+      step1: "1. Kunan ng litrato",
+      step2: "2. I-confirm ang lokasyon",
+      step3: "3. Tumanggap ng SMS update",
+      cardBtn: "Mag-ulat ng Problema Ngayon",
+      
+      aboutHeading: "Tungkol sa Platform",
+      aboutText: "Binuo ng Alcmntr upang mabigyan ang bawat residente ng mabilis at malinaw na paraan upang i-report ang mga problema sa komunidad at masubaybayan ang aksyon ng pamahalaan.",
+      footerText: "Pinapatakbo ng Alcmntr GovTech Engine. All rights reserved."
+    }
+  };
+
+  const t = content[lang];
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* 1. TOP STATUTORY & ACCESSIBILITY BAR */}
-      <div className="bg-slate-900 text-slate-300 text-xs py-2 px-4 sm:px-8 flex justify-between items-center border-b border-slate-800">
-        <div className="flex items-center space-x-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Official Civic Gateway • Bayan ng Taytay, Lalawigan ng Rizal</span>
-        </div>
-        <div className="flex items-center space-x-4">
-          <span className="hidden sm:inline">Statutory Compliance: RA 11032 (ARTA) | RA 10173 (DPA)</span>
-          <span className="bg-slate-800 px-2 py-0.5 rounded text-amber-400 font-mono">EN | FIL</span>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
+      <div>
+        {/* 1. TOP UTILITY BAR (DEFAULT ENGLISH + WORKING TOGGLE) */}
+        <div className="bg-slate-950 text-slate-300 text-xs py-2 px-4 sm:px-8 flex justify-between items-center border-b border-slate-800">
+          <div className="flex items-center space-x-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-medium tracking-wide">{t.statutoryTop}</span>
+          </div>
 
-      {/* 2. EXECUTIVE MUNICIPAL HEADER */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-full bg-blue-950 text-amber-400 flex items-center justify-center font-bold text-lg shadow-inner border-2 border-amber-400">
-              TR
-            </div>
-            <div>
-              <div className="text-xs uppercase tracking-wider font-semibold text-slate-500">Pamahalaang Bayan ng Taytay</div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">Citizen Action Portal</h1>
+            <span className="hidden sm:inline text-slate-400 text-[11px]">{t.complianceTag}</span>
+            
+            {/* The Working Language Switcher */}
+            <div className="bg-slate-800 p-0.5 rounded-md border border-slate-700 flex items-center">
+              <button
+                type="button"
+                onClick={() => setLang('en')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                  lang === 'en'
+                    ? 'bg-amber-400 text-slate-950 shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('fil')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                  lang === 'fil'
+                    ? 'bg-amber-400 text-slate-950 shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                FIL
+              </button>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <span className="hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-              Powered by <strong className="ml-1 text-slate-900">Alcmntr</strong>
+        </div>
+
+        {/* 2. CLEAN HEADER (NO INCIDENT BUTTON, RETAINS ABOUT ONLY) */}
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-blue-950 text-amber-400 flex items-center justify-center font-bold text-base shadow border border-amber-400">
+                TR
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">{t.lguSub}</div>
+                <h1 className="text-lg font-black text-slate-950 tracking-tight leading-none">{t.portalTitle}</h1>
+              </div>
+            </div>
+
+            <nav>
+              <a 
+                href="#about" 
+                className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-blue-950 px-3 py-1.5 rounded-md transition hover:bg-slate-100"
+              >
+                {t.aboutNav}
+              </a>
+            </nav>
+          </div>
+        </header>
+
+        {/* 3. HERO INTRO */}
+        <section className="bg-slate-900 text-white pt-10 pb-24 px-4 sm:px-6 text-center border-b border-slate-800">
+          <div className="max-w-xl mx-auto">
+            <div className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold mb-3">
+              {t.heroBadge}
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-2 text-white">
+              {t.heroHeading}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
+              {t.heroSub}
+            </p>
+          </div>
+        </section>
+
+        {/* 4. COMPACT PORTRAIT RECTANGLE CARD */}
+        <main className="max-w-sm mx-auto px-4 -mt-16 mb-12 relative z-10">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center">
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl mx-auto mb-3 border border-amber-200">
+              🚨
+            </div>
+
+            <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 mb-2">
+              {t.cardBadge}
             </span>
-            <a 
-              href="#module-1" 
-              className="bg-blue-950 hover:bg-blue-900 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg transition shadow"
-            >
-              Access Services
-            </a>
-          </div>
-        </div>
-      </header>
 
-      {/* 3. HERO SECTION */}
-      <section className="bg-gradient-to-b from-blue-950 via-slate-900 to-slate-900 text-white py-16 sm:py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs sm:text-sm mb-6">
-            <span>✨ Digitizing Local Governance for 300,000+ Taytayeños</span>
-          </div>
-          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white mb-6 leading-tight">
-            Mabilis, Transparent, at <br className="hidden sm:inline"/>
-            <span className="text-amber-400">Modernong Serbisyo Publiko.</span>
-          </h2>
-          <p className="text-base sm:text-lg text-slate-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Ang opisyal na digital gateway ng Pamahalaang Bayan. Mag-ulat ng sirang kalsada, mag-inquire gamit ang AI, at mag-asikaso ng mga serbisyo nang walang mahabang pila.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a 
-              href="#module-1" 
-              className="inline-flex items-center justify-center px-6 py-3.5 rounded-xl bg-amber-400 text-slate-950 font-bold text-sm sm:text-base hover:bg-amber-300 transition shadow-lg shadow-amber-400/20"
-            >
-              🚨 Mag-ulat ng Insidente (Incident Report)
-            </a>
-            <a 
-              href="#about" 
-              className="inline-flex items-center justify-center px-6 py-3.5 rounded-xl bg-slate-800 text-white font-semibold text-sm sm:text-base hover:bg-slate-700 border border-slate-700 transition"
-            >
-              Tungkol sa Sistema (About Us)
-            </a>
-          </div>
-        </div>
-      </section>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">
+              {t.cardTitle}
+            </h3>
 
-      {/* 4. ACTIVE CORE SERVICES (MODULE 1 SPOTLIGHT) */}
-      <section id="module-1" className="py-12 sm:py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20">
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-100 gap-4">
-            <div>
-              <span className="inline-block px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 mb-2">
-                🟢 Live Module 01 • Active
-              </span>
-              <h3 className="text-2xl font-bold text-slate-900">Geo-Targeted Citizen Incident Reporting</h3>
-              <p className="text-sm text-slate-600 mt-1">
-                Kunan ng litrato ang sirang streetlight, baradong kanal, o tambak na basura. Direktang maruruta sa Municipal Engineering Office (MEO) at MENRO.
-              </p>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+              {t.cardDesc}
+            </p>
+
+            {/* 3 Simple Action Steps */}
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 my-4 text-left space-y-1.5 text-xs text-slate-700">
+              <div className="flex items-center gap-2">
+                <span className="text-blue-600 font-bold">✓</span>
+                <span>{t.step1}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-blue-600 font-bold">✓</span>
+                <span>{t.step2}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-blue-600 font-bold">✓</span>
+                <span>{t.step3}</span>
+              </div>
             </div>
-            <button className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl transition shadow flex items-center justify-center gap-2 whitespace-nowrap">
-              <span>Buksan ang Reporting Form</span>
+
+            <button 
+              type="button"
+              className="w-full bg-blue-950 hover:bg-blue-900 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-xs sm:text-sm flex items-center justify-center gap-2"
+            >
+              <span>{t.cardBtn}</span>
               <span>→</span>
             </button>
           </div>
+        </main>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="text-xs text-slate-500 font-medium">Covered Barangays</div>
-              <div className="text-lg font-bold text-slate-900 mt-1">All 5 Barangays</div>
-              <div className="text-xs text-slate-400 mt-0.5">Dolores to Muzon</div>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="text-xs text-slate-500 font-medium">Target Response (ARTA)</div>
-              <div className="text-lg font-bold text-slate-900 mt-1">Under 72 Hours</div>
-              <div className="text-xs text-slate-400 mt-0.5">SGLG Criteria Aligned</div>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="text-xs text-slate-500 font-medium">Verification Standard</div>
-              <div className="text-lg font-bold text-slate-900 mt-1">Photo + GPS</div>
-              <div className="text-xs text-slate-400 mt-0.5">Anti-Spam Verified</div>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="text-xs text-slate-500 font-medium">Citizen Notification</div>
-              <div className="text-lg font-bold text-slate-900 mt-1">Automated SMS</div>
-              <div className="text-xs text-slate-400 mt-0.5">Real-time status tracking</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. FUTURE MODULES ROADMAP */}
-      <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-blue-900">Digital Modernization Roadmap</h3>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">Paparating na mga Serbisyo (Coming Soon)</h2>
-          <p className="text-sm text-slate-600 mt-2">
-            Ang buong sistema ng pamamahala ay isinasaayos upang gawing 100% digital at walang red tape.
+        {/* 5. MINIMAL ABOUT SECTION */}
+        <section id="about" className="max-w-xl mx-auto px-4 py-6 text-center border-t border-slate-200">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">{t.aboutHeading}</h4>
+          <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
+            {t.aboutText}
           </p>
-        </div>
+        </section>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 bg-blue-100 text-blue-900 text-[10px] font-extrabold uppercase px-3 py-1 rounded-bl-lg">
-              Module 02
-            </div>
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-900 flex items-center justify-center text-xl mb-4">
-                🤖
-              </div>
-              <h4 className="font-bold text-slate-900 text-lg">24/7 AI Policy Chatbot</h4>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Automated na pagsagot sa requirements para sa Business Permit, Barangay Clearance, at mga lokal na ordinansa nang walang pila.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 text-xs font-semibold text-slate-400 flex items-center gap-1">
-              <span>⏳ In Development</span>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 bg-amber-100 text-amber-900 text-[10px] font-extrabold uppercase px-3 py-1 rounded-bl-lg">
-              Module 03
-            </div>
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center text-xl mb-4">
-                💳
-              </div>
-              <h4 className="font-bold text-slate-900 text-lg">Document Vault & E-Payments</h4>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Digital issuance ng Community Tax Certificate (Cedula) at Real Property Tax (Amilyar) gamit ang GCash, Maya, at LandBank.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 text-xs font-semibold text-slate-400 flex items-center gap-1">
-              <span>⏳ In Development</span>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 bg-purple-100 text-purple-900 text-[10px] font-extrabold uppercase px-3 py-1 rounded-bl-lg">
-              Module 04
-            </div>
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-800 flex items-center justify-center text-xl mb-4">
-                📅
-              </div>
-              <h4 className="font-bold text-slate-900 text-lg">Appointment & Fast Queuing</h4>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Pag-book ng 15-minutong window sa mga tanggapan ng munisipyo na may priority lanes para sa Senior Citizens at PWDs.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 text-xs font-semibold text-slate-400 flex items-center gap-1">
-              <span>⏳ In Development</span>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 bg-rose-100 text-rose-900 text-[10px] font-extrabold uppercase px-3 py-1 rounded-bl-lg">
-              Module 05
-            </div>
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-rose-50 text-rose-800 flex items-center justify-center text-xl mb-4">
-                📢
-              </div>
-              <h4 className="font-bold text-slate-900 text-lg">Public Announcement Portal</h4>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Opisyal at agarang anunsyo para sa suspensyon ng klase sa bagyo, mga libreng gamot sa health center, at public advisories.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 text-xs font-semibold text-slate-400 flex items-center gap-1">
-              <span>⏳ In Development</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. ABOUT THE ARCHITECTURE SECTION */}
-      <section id="about" className="py-16 bg-slate-100 border-t border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Tungkol sa Teknolohiya</h3>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">Modernong Sistema para sa Bayan</h2>
-          <p className="text-sm sm:text-base text-slate-600 mt-4 leading-relaxed">
-            Ang arkitekturang ito ay binuo ng <strong className="text-slate-900">Alcmntr</strong> upang maging sandigan ng lokal na pamahalaan sa transparency, automation, at bilis ng aksyon alinsunod sa <strong>Republic Act No. 11032</strong> (Ease of Doing Business Act).
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-6 text-xs text-slate-500 font-semibold">
-            <div className="flex items-center gap-1.5">
-              <span>🛡️</span> Data Privacy Act of 2012 Encrypted
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span>⚡</span> High-Availability Serverless Node
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span>🏆</span> DILG SGLG Criteria Aligned
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. EXECUTIVE FOOTER */}
-      <footer className="bg-slate-950 text-slate-400 py-10 px-4 sm:px-6 lg:px-8 border-t border-slate-800 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <span className="font-bold text-white tracking-wider">ALCMNTR GOVTECH</span>
-            <span className="text-slate-600">•</span>
-            <span>Enterprise Municipal Platform</span>
-          </div>
-          <div className="text-slate-500">
-            Engineered for Philippine Local Government Units. All rights reserved.
-          </div>
-        </div>
+      {/* 6. MINIMAL EXECUTIVE FOOTER */}
+      <footer className="bg-slate-950 text-slate-500 py-6 px-4 text-center text-xs border-t border-slate-800">
+        <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS</p>
+        <p className="text-[11px] mt-1">{t.footerText}</p>
       </footer>
     </div>
   );
