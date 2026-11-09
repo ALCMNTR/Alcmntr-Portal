@@ -11,7 +11,7 @@ export default function MunicipalPortalLanding() {
       statutoryTop: "Official Civic Gateway • Municipality of Taytay, Rizal",
       complianceTag: "RA 11032 Compliant",
       lguSub: "Municipal Government of Taytay",
-      portalTitle: "Citizen Portal",
+      portalTitle: "Citizen Action Portal",
       aboutNav: "About",
       heroBadge: "Taytay Municipal Public Services",
       heroHeading: "Direct Public Service for Taytayeños.",
@@ -33,7 +33,7 @@ export default function MunicipalPortalLanding() {
       statutoryTop: "Opisyal na Civic Gateway • Bayan ng Taytay, Rizal",
       complianceTag: "Alinsunod sa RA 11032",
       lguSub: "Pamahalaang Bayan ng Taytay",
-      portalTitle: "Citizen Portal",
+      portalTitle: "Citizen Action Portal",
       aboutNav: "Tungkol sa Amin",
       heroBadge: "Serbisyong Publiko ng Bayan ng Taytay",
       heroHeading: "Direktang Serbisyong Publiko sa Taytay.",
@@ -58,17 +58,17 @@ export default function MunicipalPortalLanding() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
       <div>
-        {/* 1. TOP UTILITY BAR */}
-        <div className="bg-slate-950 text-slate-300 text-xs py-2 px-4 sm:px-8 flex justify-between items-center border-b border-slate-800">
+        {/* 1. TOP STATUTORY BAR (FULL WIDTH) */}
+        <div className="bg-slate-950 text-slate-300 text-xs py-2 px-4 sm:px-8 flex justify-between items-center border-b border-slate-800 w-full">
           <div className="flex items-center space-x-2">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-medium tracking-wide">{t.statutoryTop}</span>
+            <span className="font-medium tracking-wide text-[11px] sm:text-xs">{t.statutoryTop}</span>
           </div>
 
           <div className="flex items-center space-x-3">
-            <span className="hidden sm:inline text-slate-400 text-[11px]">{t.complianceTag}</span>
+            <span className="hidden md:inline text-slate-400 text-[11px]">{t.complianceTag}</span>
             
-            {/* Interactive Toggle */}
+            {/* Language Switcher */}
             <div className="bg-slate-800 p-0.5 rounded-md border border-slate-700 flex items-center">
               <button
                 type="button"
@@ -96,19 +96,27 @@ export default function MunicipalPortalLanding() {
           </div>
         </div>
 
-        {/* 2. CLEAN HEADER */}
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-blue-950 text-amber-400 flex items-center justify-center font-bold text-base shadow border border-amber-400">
-                TR
-              </div>
+        {/* 2. HEADER (PUSHED TO FAR LEFT WITH OFFICIAL TAYTAY SEAL) */}
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm w-full">
+          <div className="w-full px-4 sm:px-8 py-3 flex justify-between items-center">
+            {/* Left Aligned Brand Block */}
+            <div className="flex items-center space-x-3 text-left">
+              <img
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Taytay_Rizal_seal.png/240px-Taytay_Rizal_seal.png"
+                alt="Official Seal of Taytay, Rizal"
+                className="w-11 h-11 object-contain drop-shadow-sm flex-shrink-0"
+              />
               <div>
-                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">{t.lguSub}</div>
-                <h1 className="text-lg font-black text-slate-950 tracking-tight leading-none">{t.portalTitle}</h1>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 leading-tight">
+                  {t.lguSub}
+                </div>
+                <h1 className="text-lg font-black text-slate-950 tracking-tight leading-none mt-0.5">
+                  {t.portalTitle}
+                </h1>
               </div>
             </div>
 
+            {/* Right Aligned Navigation */}
             <nav>
               <a 
                 href="#about" 
@@ -120,7 +128,7 @@ export default function MunicipalPortalLanding() {
           </div>
         </header>
 
-        {/* 3. HERO INTRO (CLEAN SPACING, NO OVERLAP) */}
+        {/* 3. HERO INTRO */}
         <section className="bg-slate-900 text-white py-12 px-4 sm:px-6 text-center border-b border-slate-800">
           <div className="max-w-xl mx-auto">
             <div className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold mb-3">
@@ -135,7 +143,7 @@ export default function MunicipalPortalLanding() {
           </div>
         </section>
 
-        {/* 4. COMPACT PORTRAIT RECTANGLE CARD (NATURAL SPACING BELOW HERO) */}
+        {/* 4. COMPACT PORTRAIT RECTANGLE CARD */}
         <main className="max-w-sm mx-auto px-4 py-8 relative z-10">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center">
             <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl mx-auto mb-3 border border-amber-200">
@@ -154,7 +162,7 @@ export default function MunicipalPortalLanding() {
               {t.cardDesc}
             </p>
 
-            {/* 3 Simple Action Steps */}
+            {/* 3 Action Steps */}
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 my-4 text-left space-y-1.5 text-xs text-slate-700">
               <div className="flex items-center gap-2">
                 <span className="text-blue-600 font-bold">✓</span>
@@ -189,7 +197,7 @@ export default function MunicipalPortalLanding() {
         </section>
       </div>
 
-      {/* 6. FOOTER */}
+      {/* 6. MINIMAL FOOTER */}
       <footer className="bg-slate-950 text-slate-500 py-6 px-4 text-center text-xs border-t border-slate-800">
         <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS</p>
         <p className="text-[11px] mt-1">{t.footerText}</p>
