@@ -4,10 +4,8 @@
 import React, { useState } from 'react';
 
 export default function MunicipalPortalLanding() {
-  // English is set as the strict default
   const [lang, setLang] = useState<'en' | 'fil'>('en');
 
-  // Simple, citizen-friendly bilingual dictionary
   const content = {
     en: {
       statutoryTop: "Official Civic Gateway • Municipality of Taytay, Rizal",
@@ -19,7 +17,6 @@ export default function MunicipalPortalLanding() {
       heroHeading: "Direct Public Service for Taytayeños.",
       heroSub: "The official municipal gateway to submit community issues directly to local government offices for fast resolution.",
       
-      // Compact Portrait Card Content
       cardBadge: "LIVE CITIZEN DISPATCH",
       cardTitle: "Report a Problem",
       cardDesc: "Notice a broken streetlight, clogged canal, or uncollected garbage? Take a photo and report it straight to City Hall.",
@@ -42,7 +39,6 @@ export default function MunicipalPortalLanding() {
       heroHeading: "Direktang Serbisyong Publiko sa Taytay.",
       heroSub: "Ang opisyal na portal ng munisipyo upang maiparating ang mga problema sa komunidad diretso sa kinauukulan para sa agarang aksyon.",
       
-      // Compact Portrait Card Content
       cardBadge: "DIREKTONG AKSYON",
       cardTitle: "Mag-ulat ng Problema",
       cardDesc: "May sirang ilaw, baradong kanal, o tambak na basura? Kunan ng litrato at i-report agad sa Munisipyo.",
@@ -62,7 +58,7 @@ export default function MunicipalPortalLanding() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
       <div>
-        {/* 1. TOP UTILITY BAR (DEFAULT ENGLISH + WORKING TOGGLE) */}
+        {/* 1. TOP UTILITY BAR */}
         <div className="bg-slate-950 text-slate-300 text-xs py-2 px-4 sm:px-8 flex justify-between items-center border-b border-slate-800">
           <div className="flex items-center space-x-2">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -72,7 +68,7 @@ export default function MunicipalPortalLanding() {
           <div className="flex items-center space-x-3">
             <span className="hidden sm:inline text-slate-400 text-[11px]">{t.complianceTag}</span>
             
-            {/* The Working Language Switcher */}
+            {/* Interactive Toggle */}
             <div className="bg-slate-800 p-0.5 rounded-md border border-slate-700 flex items-center">
               <button
                 type="button"
@@ -100,7 +96,7 @@ export default function MunicipalPortalLanding() {
           </div>
         </div>
 
-        {/* 2. CLEAN HEADER (NO INCIDENT BUTTON, RETAINS ABOUT ONLY) */}
+        {/* 2. CLEAN HEADER */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
             <div className="flex items-center space-x-3">
@@ -124,8 +120,8 @@ export default function MunicipalPortalLanding() {
           </div>
         </header>
 
-        {/* 3. HERO INTRO */}
-        <section className="bg-slate-900 text-white pt-10 pb-24 px-4 sm:px-6 text-center border-b border-slate-800">
+        {/* 3. HERO INTRO (CLEAN SPACING, NO OVERLAP) */}
+        <section className="bg-slate-900 text-white py-12 px-4 sm:px-6 text-center border-b border-slate-800">
           <div className="max-w-xl mx-auto">
             <div className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold mb-3">
               {t.heroBadge}
@@ -139,8 +135,8 @@ export default function MunicipalPortalLanding() {
           </div>
         </section>
 
-        {/* 4. COMPACT PORTRAIT RECTANGLE CARD */}
-        <main className="max-w-sm mx-auto px-4 -mt-16 mb-12 relative z-10">
+        {/* 4. COMPACT PORTRAIT RECTANGLE CARD (NATURAL SPACING BELOW HERO) */}
+        <main className="max-w-sm mx-auto px-4 py-8 relative z-10">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center">
             <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl mx-auto mb-3 border border-amber-200">
               🚨
@@ -184,8 +180,8 @@ export default function MunicipalPortalLanding() {
           </div>
         </main>
 
-        {/* 5. MINIMAL ABOUT SECTION */}
-        <section id="about" className="max-w-xl mx-auto px-4 py-6 text-center border-t border-slate-200">
+        {/* 5. ABOUT SECTION */}
+        <section id="about" className="max-w-xl mx-auto px-4 py-8 text-center border-t border-slate-200">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">{t.aboutHeading}</h4>
           <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
             {t.aboutText}
@@ -193,7 +189,7 @@ export default function MunicipalPortalLanding() {
         </section>
       </div>
 
-      {/* 6. MINIMAL EXECUTIVE FOOTER */}
+      {/* 6. FOOTER */}
       <footer className="bg-slate-950 text-slate-500 py-6 px-4 text-center text-xs border-t border-slate-800">
         <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS</p>
         <p className="text-[11px] mt-1">{t.footerText}</p>
