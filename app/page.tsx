@@ -55,7 +55,7 @@ export default function MunicipalPortalLanding() {
           </div>
         </div>
 
-        {/* 2. HEADER WITH AUTHENTIC UPLOADED TAYTAY SEAL */}
+        {/* 2. HEADER WITH CLICKABLE DISPATCH BUTTON */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm w-full">
           <div className="w-full px-4 sm:px-8 py-3 flex justify-between items-center">
             {/* Left Brand Block */}
@@ -77,13 +77,21 @@ export default function MunicipalPortalLanding() {
               </div>
             </div>
 
-            {/* Right Navigation */}
-            <nav>
+            {/* Right Navigation: BOTH ABOUT AND CITY HALL DISPATCH BUTTONS */}
+            <nav className="flex items-center space-x-2">
               <a
                 href="#about"
-                className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-blue-950 px-3 py-1.5 rounded-md transition hover:bg-slate-100"
+                className="text-xs font-semibold text-slate-600 hover:text-blue-950 px-2.5 py-1.5 rounded-md transition hover:bg-slate-100"
               >
                 {isEn ? "About" : "Tungkol sa Amin"}
+              </a>
+              {/* CLICKABLE 1-TAP CITY HALL ADMIN BUTTON */}
+              <a
+                href="/admin"
+                className="text-xs font-bold bg-slate-900 hover:bg-blue-950 text-white px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5 border border-slate-800"
+              >
+                <span>🏛️</span>
+                <span>{isEn ? "Staff Dispatch" : "Munisipyo"}</span>
               </a>
             </nav>
           </div>
@@ -153,10 +161,10 @@ export default function MunicipalPortalLanding() {
               </div>
             </div>
 
-            {/* CONNECTED REPORT BUTTON (DIRECT LINK TO /report) */}
+            {/* 1-TAP REPORT BUTTON */}
             <a
               href="/report"
-              className="w-full bg-blue-950 hover:bg-blue-900 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-xs sm:text-sm flex items-center justify-center gap-2"
+              className="w-full bg-blue-950 hover:bg-blue-900 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-xs sm:text-sm flex items-center justify-center gap-2 block text-center"
             >
               <span>
                 {isEn ? "Report a Problem Now" : "Mag-ulat ng Problema Ngayon"}
@@ -179,9 +187,15 @@ export default function MunicipalPortalLanding() {
         </section>
       </div>
 
-      {/* 6. MINIMAL FOOTER */}
+      {/* 6. MINIMAL FOOTER WITH DISPATCH LINK */}
       <footer className="bg-slate-950 text-slate-500 py-6 px-4 text-center text-xs border-t border-slate-800">
-        <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS</p>
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+          <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS</p>
+          <span className="hidden sm:inline">•</span>
+          <a href="/admin" className="text-amber-400 hover:underline font-semibold">
+            🏛️ Municipal Staff Dispatch Portal
+          </a>
+        </div>
         <p className="text-[11px] mt-1">
           {isEn
             ? "Powered by Alcmntr GovTech Engine. All rights reserved."
