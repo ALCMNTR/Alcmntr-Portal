@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { supabase } from "../supabase-client";
+import { supabase } from "./supabase-client";
 
 interface CommunityIncident {
   id: string;
