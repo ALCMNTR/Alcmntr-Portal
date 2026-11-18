@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Direct, self-contained Supabase connection (zero path errors!)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -31,10 +30,10 @@ export default function ReportProblemPage() {
   const [barangay, setBarangay] = useState("San Juan");
   const [category, setCategory] = useState("busted_streetlight");
   const [meralcoId, setMeralcoId] = useState("");
-  const [escalationLevel, setEscalationLevel] = useState("barangay");
   const [description, setDescription] = useState("");
   const [landmark, setLandmark] = useState("");
   const [phone, setPhone] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [gpsStatus, setGpsStatus] = useState<string | null>(null);
   const [latitude, setLatitude] = useState<number>(14.5794);
   const [longitude, setLongitude] = useState<number>(121.1303);
@@ -55,7 +54,6 @@ export default function ReportProblemPage() {
 
   const barangays = ["Dolores (Poblacion)", "San Isidro", "San Juan", "Santa Ana", "Muzon"];
 
-  // Fetch live reports from Supabase
   const fetchIncidents = async () => {
     if (!supabaseUrl || !supabaseAnonKey) return;
     setLoadingFeed(true);
@@ -73,6 +71,14 @@ export default function ReportProblemPage() {
   useEffect(() => {
     fetchIncidents();
   }, [activeTab, submittedTicket]);
+
+  // Camera / Photo Upload Handler
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoPreview(URL.createObjectURL(file));
+    }
+  };
 
   // GPS Auto-detector
   const handleGetLocation = () => {
@@ -104,13 +110,14 @@ export default function ReportProblemPage() {
     setIsSubmitting(true);
 
     try {
-      // Safely grab Taytay ID and Barangay ID
       const { data: muni } = await supabase
         .from("municipalities")
         .select("id")
         .eq("name", "Taytay")
         .limit(1)
         .maybeSingle();
+
+      const muniId = muni?.id || "a0000000-0000-0000-0000-000000000001";
 
       const { data: brgy } = await supabase
         .from("barangays")
@@ -119,22 +126,20 @@ export default function ReportProblemPage() {
         .limit(1)
         .maybeSingle();
 
-      if (!muni || !brgy) {
-        alert("Database Error: Taytay or Barangay record not found in Supabase.");
+      if (!brgy) {
+        alert(`Could not find Brgy. ${barangay} in Supabase.`);
         setIsSubmitting(false);
         return;
       }
 
-      // Format description with Kuya Archie's required context (Reporter, Scope, Meralco ID)
       const poleNote = category === "busted_streetlight" && meralcoId ? ` [Meralco Pole/Bill: ${meralcoId}]` : "";
-      const scopeTag = escalationLevel === "municipal" ? "[ESCALATE: MUNICIPAL]" : "[BRGY LEVEL]";
-      const fullDescription = `${scopeTag} [By: ${fullName}]${poleNote} ${description}`;
+      const fullDescription = `[By: ${fullName}]${poleNote} ${description}`;
 
       const { data, error } = await supabase
         .from("incidents")
         .insert([
           {
-            municipality_id: muni.id,
+            municipality_id: muniId,
             barangay_id: brgy.id,
             category: category,
             description: fullDescription,
@@ -143,15 +148,15 @@ export default function ReportProblemPage() {
             latitude: latitude,
             longitude: longitude,
             status: "submitted",
-            priority: escalationLevel === "municipal" ? "high" : "medium",
-            assigned_department: escalationLevel === "municipal" ? "Taytay MEO/MENRO" : `Brgy. ${barangay}`,
+            priority: "medium",
+            assigned_department: "Pending Triage",
           },
         ])
         .select()
         .single();
 
       if (error) {
-        alert("Could not save report: " + error.message);
+        alert("Database Insert Error: " + error.message);
       } else if (data) {
         setSubmittedTicket(data.ticket_number);
         await fetchIncidents();
@@ -207,9 +212,11 @@ export default function ReportProblemPage() {
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
           <div className="max-w-xl mx-auto px-4 py-3 flex justify-between items-center">
             <div className="flex items-center space-x-3 text-left">
-              <div className="w-9 h-9 rounded-full bg-blue-950 text-amber-400 flex items-center justify-center font-black text-xs border border-amber-400">
-                TR
-              </div>
+              <img
+                src="/IMG_0970.jpeg"
+                alt="Taytay Seal"
+                className="w-10 h-10 object-contain flex-shrink-0 drop-shadow-sm"
+              />
               <div>
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 leading-tight">
                   {isEn ? "Taytay, Rizal" : "Bayan ng Taytay"}
@@ -329,8 +336,8 @@ export default function ReportProblemPage() {
               </h2>
               <p className="text-xs text-slate-600">
                 {isEn
-                  ? "Your official tracking number has been generated. No need to follow up manually on Facebook."
-                  : "Nagawa na ang inyong tracking number. Hindi na kailangang mag-follow up sa Facebook."}
+                  ? "Your official tracking number has been generated. Our dispatchers will review and route it to the proper department."
+                  : "Nagawa na ang inyong tracking number. Susuriin ng opisina kung saan ito dapat i-endorso."}
               </p>
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                 <div className="text-[10px] font-bold text-slate-500 uppercase">Ticket Number</div>
@@ -351,6 +358,7 @@ export default function ReportProblemPage() {
                   type="button"
                   onClick={() => {
                     setSubmittedTicket(null);
+                    setPhotoPreview(null);
                     setDescription("");
                     setLandmark("");
                     setMeralcoId("");
@@ -387,6 +395,43 @@ export default function ReportProblemPage() {
                 />
               </div>
 
+              {/* Camera / Photo Capture */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase text-slate-700">
+                  {isEn ? "Photo Evidence (Required) *" : "Litrato ng Problema (Kailangan) *"}
+                </label>
+                {photoPreview ? (
+                  <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500 bg-slate-900">
+                    <img src={photoPreview} alt="Preview" className="w-full h-44 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setPhotoPreview(null)}
+                      className="absolute top-2 right-2 bg-slate-950/80 text-white text-[11px] font-bold px-3 py-1 rounded-md shadow"
+                    >
+                      {isEn ? "Change Photo" : "Palitan"}
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-slate-300 hover:border-blue-950 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer bg-slate-50 hover:bg-blue-50/50 transition">
+                    <div className="text-3xl mb-1.5">📸</div>
+                    <span className="text-xs font-bold text-slate-900">
+                      {isEn ? "Tap to Take Photo or Upload" : "Pindutin para Kunan ng Litrato"}
+                    </span>
+                    <span className="text-[10px] text-slate-500 mt-0.5">
+                      {isEn ? "Live camera or gallery" : "Kamera o Gallery"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      required
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
               {/* Category */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-700 mb-2">
@@ -409,7 +454,7 @@ export default function ReportProblemPage() {
                 </div>
               </div>
 
-              {/* Kuya Archie's Meralco Pole / Bill Field (Shows automatically for Streetlights/Poles!) */}
+              {/* Meralco Pole / Bill Field */}
               {category === "busted_streetlight" && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-1.5">
                   <label className="block text-[11px] font-bold text-amber-900">
@@ -425,36 +470,20 @@ export default function ReportProblemPage() {
                 </div>
               )}
 
-              {/* Barangay & Two-Tier Escalation */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    {isEn ? "Barangay *" : "Barangay *"}
-                  </label>
-                  <select
-                    value={barangay}
-                    onChange={(e) => setBarangay(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-semibold"
-                  >
-                    {barangays.map((b) => (
-                      <option key={b} value={b}>Brgy. {b}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    {isEn ? "Severity Level *" : "Laki ng Problema *"}
-                  </label>
-                  <select
-                    value={escalationLevel}
-                    onChange={(e) => setEscalationLevel(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-semibold"
-                  >
-                    <option value="barangay">{isEn ? "Barangay Action (Local)" : "Barangay Level (Maliit)"}</option>
-                    <option value="municipal">{isEn ? "Escalate to Municipal Hall (Major)" : "Taytay Munisipyo (Malaki)"}</option>
-                  </select>
-                </div>
+              {/* Barangay */}
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
+                  {isEn ? "Barangay *" : "Barangay *"}
+                </label>
+                <select
+                  value={barangay}
+                  onChange={(e) => setBarangay(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-semibold"
+                >
+                  {barangays.map((b) => (
+                    <option key={b} value={b}>Brgy. {b}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Description */}
