@@ -1,91 +1,57 @@
 // app/report/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-// Mock Database of Existing Community Reports (For Duplicate Detection & Transparency Feed)
-interface CommunityIncident {
+interface IncidentRecord {
   id: string;
-  ticketNumber: string;
-  fullName: string;
+  ticket_number: string;
+  citizen_name: string | null;
   category: string;
-  barangay: string;
-  landmark: string;
+  meralco_pole_id?: string | null;
   description: string;
+  photo_url?: string | null;
+  landmark: string | null;
   status: "submitted" | "in_progress" | "resolved";
-  timeAgo: string;
+  created_at: string;
+  barangays?: {
+    name: string;
+  } | null;
 }
-
-const INITIAL_REPORTS: CommunityIncident[] = [
-  {
-    id: "1",
-    ticketNumber: "TAY-1042",
-    fullName: "Roberto Cruz",
-    category: "busted_streetlight",
-    barangay: "San Juan",
-    landmark: "Corner Manila East Rd near Puregold",
-    description: "Poste ng ilaw patay-sindi, delikado sa mga motorista tuwing gabi.",
-    status: "in_progress",
-    timeAgo: "3 hours ago",
-  },
-  {
-    id: "2",
-    ticketNumber: "TAY-1040",
-    fullName: "Maria Santos",
-    category: "uncollected_garbage",
-    barangay: "Dolores (Poblacion)",
-    landmark: "Rizal Ave, tapat ng Barangay Hall",
-    description: "Tambak na scrap fabric at commercial waste mula weekend tiangge.",
-    status: "resolved",
-    timeAgo: "1 day ago",
-  },
-  {
-    id: "3",
-    ticketNumber: "TAY-1039",
-    fullName: "Danilo Reyes",
-    category: "clogged_drainage",
-    barangay: "Muzon",
-    landmark: "Purok 4, malapit sa creek",
-    description: "Baradong kanal sanhi ng plastic waste, tumataas ang tubig kapag umuulan.",
-    status: "in_progress",
-    timeAgo: "5 hours ago",
-  },
-  {
-    id: "4",
-    ticketNumber: "TAY-1038",
-    fullName: "Elena Gomez",
-    category: "road_pothole",
-    barangay: "Santa Ana",
-    landmark: "Highway intersection",
-    description: "Malalim na lubak sa gitna ng kalsada, sumasayad ang mga tricycle.",
-    status: "resolved",
-    timeAgo: "2 days ago",
-  },
-];
 
 export default function ReportProblemPage() {
   const [lang, setLang] = useState<"en" | "fil">("en");
   const isEn = lang === "en";
 
-  // Navigation Sub-tab: Form vs. Community Feed
+  // Sub-Navigation Tabs: Form vs. Community Tracker
   const [activeTab, setActiveTab] = useState<"form" | "tracker">("form");
   const [feedFilter, setFeedFilter] = useState<"all" | "in_progress" | "resolved">("in_progress");
 
-  // Form State
+  // Form Fields
   const [fullName, setFullName] = useState("");
-  const [barangay, setBarangay] = useState("San Juan");
+  const [barangayName, setBarangayName] = useState("San Juan");
   const [category, setCategory] = useState("busted_streetlight");
+  const [meralcoPoleId, setMeralcoPoleId] = useState("");
   const [description, setDescription] = useState("");
   const [landmark, setLandmark] = useState("");
   const [phone, setPhone] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [gpsStatus, setGpsStatus] = useState<string | null>(null);
-  const [submittedTicket, setSubmittedTicket] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Categories list
+  // Submission & UI States
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedTicket, setSubmittedTicket] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Live Database Incidents Feed
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [loadingFeed, setLoadingFeed] = useState(false);
+
   const categories = [
-    { id: "busted_streetlight", icon: "💡", en: "Busted Streetlight", fil: "Sirang Streetlight" },
+    { id: "busted_streetlight", icon: "💡", en: "Busted Streetlight / Pole", fil: "Sirang Streetlight / Poste" },
     { id: "clogged_drainage", icon: "🌊", en: "Clogged Drainage / Flooding", fil: "Baradong Kanal / Baha" },
     { id: "uncollected_garbage", icon: "🗑️", en: "Uncollected Garbage", fil: "Tambak na Basura" },
     { id: "road_pothole", icon: "🕳️", en: "Road Pothole / Hazard", fil: "Lubak sa Kalsada" },
@@ -95,53 +61,173 @@ export default function ReportProblemPage() {
 
   const barangays = ["Dolores (Poblacion)", "San Isidro", "San Juan", "Santa Ana", "Muzon"];
 
-  // DUPLICATE DETECTION LOGIC: Checks if an active ticket exists with the same category and barangay
-  const duplicateAlert = INITIAL_REPORTS.find(
-    (report) =>
-      report.category === category &&
-      report.barangay === barangay &&
-      report.status !== "resolved"
-  );
+  // 1. Fetch live incidents from Supabase for Tracker & Duplicate Detection
+  const fetchIncidents = async () => {
+    setLoadingFeed(true);
+    try {
+      const { data, error } = await supabase
+        .from("incidents")
+        .select(`
+          id,
+          ticket_number,
+          citizen_name,
+          category,
+          meralco_pole_id,
+          description,
+          photo_url,
+          landmark,
+          status,
+          created_at,
+          barangays ( name )
+        `)
+        .order("created_at", { ascending: false });
 
-  // Photo Handler
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPhotoPreview(URL.createObjectURL(file));
+      if (error) {
+        console.error("Error fetching incidents:", error.message);
+      } else if (data) {
+        // Safe mapping to match TypeScript interface
+        const formatted: IncidentRecord[] = data.map((item: any) => ({
+          ...item,
+          barangays: Array.isArray(item.barangays) ? item.barangays[0] : item.barangays,
+        }));
+        setIncidents(formatted);
+      }
+    } catch (err) {
+      console.error("Fetch failed:", err);
+    } finally {
+      setLoadingFeed(false);
     }
   };
 
-  // GPS Auto-detector
+  useEffect(() => {
+    fetchIncidents();
+  }, []);
+
+  // 2. LIVE SMART DUPLICATE DETECTION ALERT: Checks active incidents matching category and barangay
+  const duplicateAlert = incidents.find((rep) => {
+    const repBarangay = rep.barangays?.name || "";
+    return (
+      rep.category === category &&
+      repBarangay.toLowerCase() === barangayName.toLowerCase() &&
+      rep.status !== "resolved"
+    );
+  });
+
+  // 3. Photo Handler: Converts file to Base64 so it securely embeds directly into Supabase
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 4. GPS Auto-detector
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      setGpsStatus(isEn ? "GPS not supported on device" : "Hindi suportado ang GPS");
+      setGpsStatus(isEn ? "GPS not supported on device" : "Hindi suportado ang GPS sa device");
       return;
     }
     setGpsStatus(isEn ? "Acquiring GPS coordinates..." : "Hinahanap ang GPS coordinates...");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setLatitude(pos.coords.latitude);
+        setLongitude(pos.coords.longitude);
         setGpsStatus(`GPS: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
       },
       () => {
-        setGpsStatus(isEn ? "Location access denied. Please type landmark." : "Hindi ma-access ang GPS. Pakisulat ang landmark.");
+        setGpsStatus(
+          isEn
+            ? "Location access denied. Please type landmark."
+            : "Hindi ma-access ang GPS. Pakisulat ang landmark."
+        );
       }
     );
   };
 
-  // Form Submit
-  const handleSubmit = (e: React.FormEvent) => {
+  // 5. Submit Form Directly to Supabase
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    setTimeout(() => {
-      const randomTicket = "TAY-" + Math.floor(1000 + Math.random() * 9000);
-      setSubmittedTicket(randomTicket);
+    try {
+      // Step A: Find the Taytay Municipality ID
+      const { data: muniData, error: muniError } = await supabase
+        .from("municipalities")
+        .select("id")
+        .ilike("name", "%Taytay%")
+        .limit(1)
+        .single();
+
+      if (muniError || !muniData) {
+        throw new Error(
+          isEn
+            ? "Municipality of Taytay record not found in database."
+            : "Hindi makita ang talaan ng Bayan ng Taytay sa database."
+        );
+      }
+
+      // Step B: Find Barangay ID
+      const { data: bgyData, error: bgyError } = await supabase
+        .from("barangays")
+        .select("id")
+        .eq("municipality_id", muniData.id)
+        .ilike("name", `%${barangayName}%`)
+        .limit(1)
+        .single();
+
+      if (bgyError || !bgyData) {
+        throw new Error(
+          isEn
+            ? `Barangay ${barangayName} record not found in database.`
+            : `Hindi makita ang Barangay ${barangayName} sa database.`
+        );
+      }
+
+      // Step C: Generate Ticket Number (#TAY-XXXX)
+      const generatedTicket = "TAY-" + Math.floor(1000 + Math.random() * 9000);
+
+      // Step D: Insert Incident into Supabase
+      const { error: insertError } = await supabase.from("incidents").insert([
+        {
+          ticket_number: generatedTicket,
+          municipality_id: muniData.id,
+          barangay_id: bgyData.id,
+          citizen_name: fullName.trim(),
+          category: category,
+          meralco_pole_id: category === "busted_streetlight" && meralcoPoleId.trim() ? meralcoPoleId.trim() : null,
+          description: description.trim(),
+          photo_url: photoPreview,
+          latitude: latitude,
+          longitude: longitude,
+          landmark: landmark.trim(),
+          citizen_phone: phone.trim(),
+          status: "submitted",
+        },
+      ]);
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      // Success: Save ticket and refresh tracker feed
+      setSubmittedTicket(generatedTicket);
+      fetchIncidents();
+    } catch (err: any) {
+      console.error("Submission failed:", err);
+      setSubmitError(err.message || "Failed to submit incident. Please check your connection.");
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
   };
 
-  const filteredFeed = INITIAL_REPORTS.filter((r) => {
+  const filteredFeed = incidents.filter((r) => {
     if (feedFilter === "all") return true;
+    if (feedFilter === "in_progress") return r.status === "in_progress" || r.status === "submitted";
     return r.status === feedFilter;
   });
 
@@ -214,7 +300,10 @@ export default function ReportProblemPage() {
           <div className="grid grid-cols-2 bg-slate-200 p-1 rounded-xl text-xs font-bold text-center">
             <button
               type="button"
-              onClick={() => setActiveTab("form")}
+              onClick={() => {
+                setActiveTab("form");
+                setSubmittedTicket(null);
+              }}
               className={`py-2.5 rounded-lg transition-all ${
                 activeTab === "form"
                   ? "bg-white text-slate-950 shadow"
@@ -225,7 +314,10 @@ export default function ReportProblemPage() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("tracker")}
+              onClick={() => {
+                setActiveTab("tracker");
+                fetchIncidents();
+              }}
               className={`py-2.5 rounded-lg transition-all ${
                 activeTab === "tracker"
                   ? "bg-white text-slate-950 shadow"
@@ -248,13 +340,14 @@ export default function ReportProblemPage() {
                     {isEn ? "Community Problem Tracker" : "Subaybayan ang mga Problema"}
                   </h2>
                   <p className="text-xs text-slate-500">
-                    {isEn ? "Real-time municipal work orders in Taytay" : "Kasalukuyang inaaksyunan ng munisipyo"}
+                    {isEn ? "Live municipal work orders in Taytay" : "Kasalukuyang inaaksyunan ng munisipyo"}
                   </p>
                 </div>
 
                 {/* Filter Pills */}
                 <div className="flex gap-1 bg-slate-200 p-1 rounded-lg text-[10px] font-bold">
                   <button
+                    type="button"
                     onClick={() => setFeedFilter("in_progress")}
                     className={`px-2.5 py-1 rounded transition ${
                       feedFilter === "in_progress"
@@ -262,9 +355,10 @@ export default function ReportProblemPage() {
                         : "text-slate-600"
                     }`}
                   >
-                    {isEn ? "In Progress" : "Inaaksyunan"}
+                    {isEn ? "Active" : "Aktibo"}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setFeedFilter("resolved")}
                     className={`px-2.5 py-1 rounded transition ${
                       feedFilter === "resolved"
@@ -275,6 +369,7 @@ export default function ReportProblemPage() {
                     {isEn ? "Resolved" : "Nagawa Na"}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setFeedFilter("all")}
                     className={`px-2.5 py-1 rounded transition ${
                       feedFilter === "all"
@@ -287,58 +382,92 @@ export default function ReportProblemPage() {
                 </div>
               </div>
 
-              {/* Incidents List */}
-              <div className="space-y-3">
-                {filteredFeed.map((report) => (
-                  <div
-                    key={report.id}
-                    className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2.5"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono font-black text-slate-900">
-                          #{report.ticketNumber}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                          Brgy. {report.barangay}
+              {loadingFeed ? (
+                <div className="text-center py-10 text-xs font-semibold text-slate-400 animate-pulse">
+                  {isEn ? "Loading live Taytay dispatch records..." : "Kinukuha ang mga ulat ng munisipyo..."}
+                </div>
+              ) : filteredFeed.length === 0 ? (
+                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-xs text-slate-500 space-y-2">
+                  <div className="text-2xl">📋</div>
+                  <div className="font-bold text-slate-800">
+                    {isEn ? "No incident reports logged yet." : "Wala pang naiuulat na problema."}
+                  </div>
+                  <p>
+                    {isEn
+                      ? "Be the first to submit an incident for your barangay!"
+                      : "Maging una sa pag-ulat ng problema sa inyong barangay!"}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredFeed.map((report) => (
+                    <div
+                      key={report.id}
+                      className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2.5"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-black text-slate-900">
+                            #{report.ticket_number}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            Brgy. {report.barangays?.name || "Taytay"}
+                          </span>
+                        </div>
+
+                        {/* Status Badge */}
+                        {report.status === "in_progress" && (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                            ⚡ IN PROGRESS
+                          </span>
+                        )}
+                        {report.status === "resolved" && (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                            ✓ RESOLVED
+                          </span>
+                        )}
+                        {report.status === "submitted" && (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300">
+                            📩 SUBMITTED
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Photo Thumbnail if uploaded */}
+                      {report.photo_url && (
+                        <img
+                          src={report.photo_url}
+                          alt="Incident proof"
+                          className="w-full h-36 object-cover rounded-lg border border-slate-100"
+                        />
+                      )}
+
+                      <p className="text-xs font-medium text-slate-800 leading-snug">
+                        "{report.description}"
+                      </p>
+
+                      {report.meralco_pole_id && (
+                        <div className="text-[10px] font-mono text-amber-800 bg-amber-50 px-2 py-1 rounded inline-block border border-amber-200">
+                          ⚡ Meralco Pole / Bill: {report.meralco_pole_id}
+                        </div>
+                      )}
+
+                      <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
+                        <span>📍 {report.landmark || "Taytay, Rizal"}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(report.created_at).toLocaleDateString()}
                         </span>
                       </div>
 
-                      {/* Status Badge */}
-                      {report.status === "in_progress" && (
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
-                          ⚡ IN PROGRESS
-                        </span>
-                      )}
-                      {report.status === "resolved" && (
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
-                          ✓ RESOLVED
-                        </span>
-                      )}
-                      {report.status === "submitted" && (
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300">
-                          📩 SUBMITTED
-                        </span>
-                      )}
+                      {/* Verified Citizen Byline */}
+                      <div className="text-[10px] text-slate-400 flex justify-between items-center">
+                        <span>Reported by: {report.citizen_name || "Concerned Taytayeño"}</span>
+                        <span className="text-emerald-700 font-bold">● Public Works Logged</span>
+                      </div>
                     </div>
-
-                    <p className="text-xs font-medium text-slate-800 leading-snug">
-                      "{report.description}"
-                    </p>
-
-                    <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
-                      <span>📍 {report.landmark}</span>
-                      <span className="text-[10px] text-slate-400">{report.timeAgo}</span>
-                    </div>
-
-                    {/* Verified Citizen Byline */}
-                    <div className="text-[10px] text-slate-400 flex justify-between items-center">
-                      <span>Reported by: {report.fullName}</span>
-                      <span className="text-emerald-700 font-bold">● Public Works Logged</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : submittedTicket ? (
             /* SUCCESS CONFIRMATION SCREEN */
@@ -361,7 +490,7 @@ export default function ReportProblemPage() {
                   : "Ang inyong ulat ay naipasok na sa sistema ng munisipyo upang maaksyunan ng dispatch crew."}
               </p>
 
-              {/* Ticket Card with Status Progression */}
+              {/* Ticket Card with 3-Step Lifecycle Visual Indicator */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 my-6 text-center">
                 <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                   {isEn ? "Official Ticket Reference" : "Numero ng Ulat"}
@@ -370,24 +499,24 @@ export default function ReportProblemPage() {
                   #{submittedTicket}
                 </div>
 
-                {/* 3-Step Lifecycle Visual Indicator */}
+                {/* 3-Step Lifecycle Indicator */}
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-200 text-center">
                   <div className="space-y-1">
-                    <div className="w-4 h-4 rounded-full bg-blue-600 mx-auto text-[10px] text-white flex items-center justify-center font-bold">
-                      1
+                    <div className="w-5 h-5 rounded-full bg-blue-600 mx-auto text-[10px] text-white flex items-center justify-center font-bold">
+                      ✓
                     </div>
                     <div className="text-[9px] font-bold text-blue-900">SUBMITTED</div>
-                    <div className="text-[8px] text-slate-400">Completed</div>
+                    <div className="text-[8px] text-slate-400">Logged</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="w-4 h-4 rounded-full bg-amber-400 mx-auto text-[10px] text-slate-900 flex items-center justify-center font-bold animate-pulse">
+                    <div className="w-5 h-5 rounded-full bg-amber-400 mx-auto text-[10px] text-slate-900 flex items-center justify-center font-bold animate-pulse">
                       2
                     </div>
                     <div className="text-[9px] font-bold text-amber-700">IN PROGRESS</div>
-                    <div className="text-[8px] text-slate-400">Dispatching</div>
+                    <div className="text-[8px] text-slate-400">Queued</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="w-4 h-4 rounded-full bg-slate-200 mx-auto text-[10px] text-slate-500 flex items-center justify-center font-bold">
+                    <div className="w-5 h-5 rounded-full bg-slate-200 mx-auto text-[10px] text-slate-500 flex items-center justify-center font-bold">
                       3
                     </div>
                     <div className="text-[9px] font-bold text-slate-400">RESOLVED</div>
@@ -399,13 +528,16 @@ export default function ReportProblemPage() {
               <div className="text-xs text-slate-500 mb-6 leading-relaxed">
                 {isEn
                   ? `Automated SMS notifications will be dispatched to +63 ${phone} throughout the repair process.`
-                  : `Makakatanggap ka ng libreng SMS text sa +63 ${phone} sa bawat galaw ng repair team.`}
+                  : `Makakatanggap ka ng libreng SMS update sa +63 ${phone} sa bawat galaw ng repair team.`}
               </div>
 
               <div className="flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={() => setActiveTab("tracker")}
+                  onClick={() => {
+                    setActiveTab("tracker");
+                    fetchIncidents();
+                  }}
                   className="w-full bg-blue-950 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-xl shadow transition text-xs sm:text-sm"
                 >
                   {isEn ? "View on Community Tracker" : "Tingnan sa Community Tracker"}
@@ -434,6 +566,13 @@ export default function ReportProblemPage() {
                     : "Iparating ang mga sirang pasilidad diretso sa mga tanggapan ng munisipyo."}
                 </p>
               </div>
+
+              {/* Error Banner */}
+              {submitError && (
+                <div className="bg-red-50 border border-red-300 text-red-800 text-xs p-3.5 rounded-xl font-medium">
+                  {submitError}
+                </div>
+              )}
 
               {/* CITIZEN FULL NAME */}
               <div className="space-y-1.5">
@@ -471,10 +610,10 @@ export default function ReportProblemPage() {
                   <label className="border-2 border-dashed border-slate-300 hover:border-blue-950 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-50 hover:bg-blue-50/50 transition">
                     <div className="text-3xl mb-2">📸</div>
                     <span className="text-xs font-bold text-slate-900">
-                      {isEn ? "Tap to Take Photo or Upload" : "Pindutin para Kunan ng Litrato"}
+                      {isEn ? "Tap to Take Live Photo or Upload" : "Pindutin para Kunan ng Litrato"}
                     </span>
                     <span className="text-[10px] text-slate-500 mt-1">
-                      {isEn ? "Live camera or gallery" : "Kamera o Gallery"}
+                      {isEn ? "Live camera verification prevents false alarms" : "Pinipigilan ang pekeng ulat"}
                     </span>
                     <input
                       type="file"
@@ -512,14 +651,35 @@ export default function ReportProblemPage() {
                 </div>
               </div>
 
-              {/* STEP 3: BARANGAY SELECTION */}
+              {/* KUYA ARCHIE'S UTILITY RULE: CONDITIONAL MERALCO POLE ID */}
+              {category === "busted_streetlight" && (
+                <div className="space-y-1.5 bg-amber-50/80 p-3.5 rounded-xl border border-amber-200">
+                  <label className="block text-xs font-bold text-amber-950">
+                    ⚡ {isEn ? "Meralco Pole Number / Nearest Bill # (Optional)" : "Numero ng Poste o Meralco Bill (Kung Alam)"}
+                  </label>
+                  <p className="text-[10px] text-amber-800 leading-tight">
+                    {isEn
+                      ? "Per Kuya Archie's protocol: providing the yellow/black pole tag or nearby electric bill number expedites Meralco dispatch."
+                      : "Ayon sa patakaran ng San Juan desk: ang numero sa dilaw na tag ng poste o bill ay nagpapabilis ng aksyon ng Meralco."}
+                  </p>
+                  <input
+                    type="text"
+                    placeholder={isEn ? "e.g., Pole # 42A-99 or Meralco SIN" : "hal. Pole # 42A-99 o SIN"}
+                    value={meralcoPoleId}
+                    onChange={(e) => setMeralcoPoleId(e.target.value)}
+                    className="w-full bg-white border border-amber-300 rounded-lg py-2.5 px-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                  />
+                </div>
+              )}
+
+              {/* STEP 3: BARANGAY SELECTION (Staff decide escalation level, not citizen) */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                   {isEn ? "Select Barangay in Taytay *" : "Piliin ang Barangay sa Taytay *"}
                 </label>
                 <select
-                  value={barangay}
-                  onChange={(e) => setBarangay(e.target.value)}
+                  value={barangayName}
+                  onChange={(e) => setBarangayName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl py-3 px-3.5 text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950"
                 >
                   {barangays.map((b) => (
@@ -543,8 +703,8 @@ export default function ReportProblemPage() {
                   </div>
                   <p className="text-[11px] leading-relaxed text-amber-800">
                     {isEn
-                      ? `Ticket #${duplicateAlert.ticketNumber} for a similar issue in Brgy. ${barangay} is already under review. You can still submit if this is a separate location.`
-                      : `Ang Ticket #${duplicateAlert.ticketNumber} sa Brgy. ${barangay} ay kasalukuyan nang inaaksyunan ng munisipyo.`}
+                      ? `Ticket #${duplicateAlert.ticket_number} for a similar issue in Brgy. ${barangayName} is already logged. You may still submit if this is a separate location.`
+                      : `Ang Ticket #${duplicateAlert.ticket_number} sa Brgy. ${barangayName} ay kasalukuyan nang naitala. Maari pa ring magsumite kung ito ay sa ibang lugar.`}
                   </p>
                   <button
                     type="button"
@@ -611,7 +771,7 @@ export default function ReportProblemPage() {
                 />
               </div>
 
-              {/* STEP 6: MOBILE NUMBER (FOR SMS UPDATES) */}
+              {/* STEP 6: MOBILE NUMBER (FOR ARTA COMPLIANT SMS UPDATES) */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                   {isEn ? "Mobile Phone Number (+63) *" : "Cellphone Number para sa SMS Update *"}
@@ -632,7 +792,7 @@ export default function ReportProblemPage() {
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
                   {isEn
-                    ? "Protected under RA 10173. Encrypted and strictly utilized for municipal dispatch status notifications."
+                    ? "Protected under RA 10173. Strictly utilized for municipal dispatch status notifications."
                     : "Protektado ng Data Privacy Act. Gagamitin lamang para mag-text kapag naayos na ang ulat."}
                 </p>
               </div>
@@ -644,7 +804,7 @@ export default function ReportProblemPage() {
                 className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-black py-4 px-4 rounded-xl shadow-lg transition text-sm flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
-                  <span>{isEn ? "Dispatching Report to MEO..." : "Ipinapadala sa Munisipyo..."}</span>
+                  <span>{isEn ? "Dispatching Report to Taytay LGU..." : "Ipinapadala sa Munisipyo..."}</span>
                 ) : (
                   <>
                     <span>{isEn ? "Submit Incident Report" : "Ipasa ang Ulat sa Munisipyo"}</span>
