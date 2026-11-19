@@ -9,6 +9,17 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Taytay Official ID and Barangay Map directly from database
+const TAYTAY_MUNICIPALITY_ID = "5b0dc55a-afb6-467c-aff0-48290cfad8b4";
+
+const BARANGAY_ID_MAP: Record<string, string> = {
+  "Santa Ana": "22a5ab59-338a-4990-9d60-f106f72b53f6",
+  "San Isidro": "4040d20b-a706-473c-8f07-c6792958f01f",
+  "San Juan": "42606f19-66d7-4c19-8e7b-d49c39f26f63",
+  "Dolores (Poblacion)": "5a366ac4-c146-41ef-8cdd-97ede8198f48",
+  "Muzon": "6c74ba7f-6e93-486b-adab-28b20bd3ea3f",
+};
+
 interface IncidentRecord {
   id: string;
   ticket_number: string;
@@ -159,48 +170,25 @@ export default function ReportProblemPage() {
     setSubmitError(null);
 
     try {
-      // Step A: Find Taytay Municipality ID
-      const { data: muniData, error: muniError } = await supabase
-        .from("municipalities")
-        .select("id")
-        .ilike("name", "%Taytay%")
-        .limit(1)
-        .single();
-
-      if (muniError || !muniData) {
+      // Find Barangay ID from mapped list
+      const barangayId = BARANGAY_ID_MAP[barangayName];
+      if (!barangayId) {
         throw new Error(
           isEn
-            ? "Municipality of Taytay record not found in database."
-            : "Hindi makita ang talaan ng Bayan ng Taytay sa database."
+            ? `Barangay ${barangayName} record not recognized.`
+            : `Hindi makilala ang Barangay ${barangayName}.`
         );
       }
 
-      // Step B: Find Barangay ID
-      const { data: bgyData, error: bgyError } = await supabase
-        .from("barangays")
-        .select("id")
-        .eq("municipality_id", muniData.id)
-        .ilike("name", `%${barangayName}%`)
-        .limit(1)
-        .single();
-
-      if (bgyError || !bgyData) {
-        throw new Error(
-          isEn
-            ? `Barangay ${barangayName} record not found in database.`
-            : `Hindi makita ang Barangay ${barangayName} sa database.`
-        );
-      }
-
-      // Step C: Generate Ticket Number (#TAY-XXXX)
+      // Generate Ticket Number (#TAY-XXXX)
       const generatedTicket = "TAY-" + Math.floor(1000 + Math.random() * 9000);
 
-      // Step D: Insert Incident into Supabase
+      // Insert Incident into Supabase
       const { error: insertError } = await supabase.from("incidents").insert([
         {
           ticket_number: generatedTicket,
-          municipality_id: muniData.id,
-          barangay_id: bgyData.id,
+          municipality_id: TAYTAY_MUNICIPALITY_ID,
+          barangay_id: barangayId,
           citizen_name: fullName.trim(),
           category: category,
           meralco_pole_id: category === "busted_streetlight" && meralcoPoleId.trim() ? meralcoPoleId.trim() : null,
@@ -218,7 +206,7 @@ export default function ReportProblemPage() {
         throw insertError;
       }
 
-      // Success
+      // Success!
       setSubmittedTicket(generatedTicket);
       fetchIncidents();
     } catch (err: any) {
