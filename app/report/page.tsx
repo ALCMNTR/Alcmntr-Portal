@@ -2,7 +2,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { supabase } from "../supabase";
+import { createClient } from "@supabase/supabase-js";
+
+// Bulletproof self-contained Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface IncidentRecord {
   id: string;
@@ -85,7 +90,6 @@ export default function ReportProblemPage() {
       if (error) {
         console.error("Error fetching incidents:", error.message);
       } else if (data) {
-        // Safe mapping to match TypeScript interface
         const formatted: IncidentRecord[] = data.map((item: any) => ({
           ...item,
           barangays: Array.isArray(item.barangays) ? item.barangays[0] : item.barangays,
@@ -103,7 +107,7 @@ export default function ReportProblemPage() {
     fetchIncidents();
   }, []);
 
-  // 2. LIVE SMART DUPLICATE DETECTION ALERT: Checks active incidents matching category and barangay
+  // 2. LIVE SMART DUPLICATE DETECTION ALERT
   const duplicateAlert = incidents.find((rep) => {
     const repBarangay = rep.barangays?.name || "";
     return (
@@ -113,7 +117,7 @@ export default function ReportProblemPage() {
     );
   });
 
-  // 3. Photo Handler: Converts file to Base64 so it securely embeds directly into Supabase
+  // 3. Photo Handler: Converts file to Base64 so it stores cleanly
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -155,7 +159,7 @@ export default function ReportProblemPage() {
     setSubmitError(null);
 
     try {
-      // Step A: Find the Taytay Municipality ID
+      // Step A: Find Taytay Municipality ID
       const { data: muniData, error: muniError } = await supabase
         .from("municipalities")
         .select("id")
@@ -214,7 +218,7 @@ export default function ReportProblemPage() {
         throw insertError;
       }
 
-      // Success: Save ticket and refresh tracker feed
+      // Success
       setSubmittedTicket(generatedTicket);
       fetchIncidents();
     } catch (err: any) {
