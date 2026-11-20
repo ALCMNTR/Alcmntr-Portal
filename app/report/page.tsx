@@ -191,14 +191,22 @@ export default function ReportProblemPage() {
     setSubmitError(null);
 
     try {
-      // Find Barangay ID from mapped list
-      const barangayId = BARANGAY_ID_MAP[barangayName];
-      if (!barangayId) {
-        throw new Error(
-          isEn
-            ? `Barangay ${barangayName} record not recognized.`
-            : `Hindi makilala ang Barangay ${barangayName}.`
-        );
+ // Dynamically fetch the real Taytay ID & Barangay ID straight from database
+      const { data: muniData } = await supabase
+        .from("municipalities")
+        .select("id")
+        .limit(1)
+        .single();
+
+      const { data: bgyData } = await supabase
+        .from("barangays")
+        .select("id")
+        .ilike("name", `%${barangayName.split(" ")[0]}%`)
+        .limit(1)
+        .single();
+
+      if (!muniData || !bgyData) {
+        throw new Error("Unable to link Municipality or Barangay record.");
       }
 
       // Generate Ticket Number (#TAY-XXXX)
@@ -208,8 +216,8 @@ export default function ReportProblemPage() {
       const { error: insertError } = await supabase.from("incidents").insert([
         {
           ticket_number: generatedTicket,
-          municipality_id: TAYTAY_MUNICIPALITY_ID,
-          barangay_id: barangayId,
+          municipality_id: muniData.id,
+          barangay_id: bgyData.id,
           citizen_name: fullName.trim(),
           category: category,
           meralco_pole_id: category === "busted_streetlight" && meralcoPoleId.trim() ? meralcoPoleId.trim() : null,
