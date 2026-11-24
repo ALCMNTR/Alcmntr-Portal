@@ -28,8 +28,11 @@ interface IncidentRecord {
   meralco_pole_id?: string | null;
   description: string;
   photo_url?: string | null;
+  resolution_photo_url?: string | null;
+  resolution_note?: string | null;
   landmark: string | null;
   status: "submitted" | "in_progress" | "resolved";
+  assigned_department?: string | null;
   created_at: string;
   barangays?: {
     name: string;
@@ -42,7 +45,8 @@ export default function ReportProblemPage() {
 
   // Sub-Navigation Tabs: Form vs. Community Tracker
   const [activeTab, setActiveTab] = useState<"form" | "tracker">("form");
-  const [feedFilter, setFeedFilter] = useState<"all" | "in_progress" | "resolved">("in_progress");
+  const [feedFilter, setFeedFilter] = useState<"all" | "in_progress" | "resolved">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Form Fields
   const [fullName, setFullName] = useState("");
@@ -77,7 +81,7 @@ export default function ReportProblemPage() {
 
   const barangays = ["Dolores (Poblacion)", "San Isidro", "San Juan", "Santa Ana", "Muzon"];
 
-  // 1. Fetch live incidents from Supabase for Tracker & Duplicate Detection
+  // 1. Fetch live incidents from Supabase
   const fetchIncidents = async () => {
     setLoadingFeed(true);
     try {
@@ -91,8 +95,11 @@ export default function ReportProblemPage() {
           meralco_pole_id,
           description,
           photo_url,
+          resolution_photo_url,
+          resolution_note,
           landmark,
           status,
+          assigned_department,
           created_at,
           barangays ( name )
         `)
@@ -128,7 +135,7 @@ export default function ReportProblemPage() {
     );
   });
 
- // 3. Smart Photo Handler: Compresses high-res iPad photos to under 300KB
+  // 3. Smart Photo Handler: Compresses high-res iPad photos to under 300KB
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -191,7 +198,6 @@ export default function ReportProblemPage() {
     setSubmitError(null);
 
     try {
- // Dynamically fetch the real Taytay ID & Barangay ID straight from database
       const { data: muniData } = await supabase
         .from("municipalities")
         .select("id")
@@ -209,10 +215,8 @@ export default function ReportProblemPage() {
         throw new Error("Unable to link Municipality or Barangay record.");
       }
 
-      // Generate Ticket Number (#TAY-XXXX)
       const generatedTicket = "TAY-" + Math.floor(1000 + Math.random() * 9000);
 
-      // Insert Incident into Supabase
       const { error: insertError } = await supabase.from("incidents").insert([
         {
           ticket_number: generatedTicket,
@@ -232,10 +236,9 @@ export default function ReportProblemPage() {
       ]);
 
       if (insertError) {
-        throw insertError;
+        throw new Error(insertError.message);
       }
 
-      // Success!
       setSubmittedTicket(generatedTicket);
       fetchIncidents();
     } catch (err: any) {
@@ -246,10 +249,24 @@ export default function ReportProblemPage() {
     }
   };
 
+  // Filter & Search Logic for Community Tracker
   const filteredFeed = incidents.filter((r) => {
-    if (feedFilter === "all") return true;
-    if (feedFilter === "in_progress") return r.status === "in_progress" || r.status === "submitted";
-    return r.status === feedFilter;
+    const matchStatus =
+      feedFilter === "all"
+        ? true
+        : feedFilter === "in_progress"
+        ? r.status === "in_progress" || r.status === "submitted"
+        : r.status === feedFilter;
+
+    const q = searchQuery.trim().toLowerCase();
+    const matchSearch =
+      q === "" ||
+      r.ticket_number.toLowerCase().includes(q) ||
+      (r.barangays?.name || "").toLowerCase().includes(q) ||
+      r.description.toLowerCase().includes(q) ||
+      (r.landmark || "").toLowerCase().includes(q);
+
+    return matchStatus && matchSearch;
   });
 
   return (
@@ -264,7 +281,6 @@ export default function ReportProblemPage() {
             </span>
           </div>
 
-          {/* Language Switcher */}
           <div className="bg-slate-800 p-0.5 rounded-md border border-slate-700 flex items-center">
             <button
               type="button"
@@ -316,7 +332,7 @@ export default function ReportProblemPage() {
           </div>
         </header>
 
-        {/* SUB-NAVIGATION TABS (Report vs. Public Community Feed) */}
+        {/* SUB-NAVIGATION TABS */}
         <div className="max-w-xl mx-auto px-4 pt-4">
           <div className="grid grid-cols-2 bg-slate-200 p-1 rounded-xl text-xs font-bold text-center">
             <button
@@ -355,25 +371,60 @@ export default function ReportProblemPage() {
           {activeTab === "tracker" ? (
             /* TAB 2: PUBLIC COMMUNITY INCIDENT TRACKER */
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
-                    {isEn ? "Community Problem Tracker" : "Subaybayan ang mga Problema"}
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    {isEn ? "Live municipal work orders in Taytay" : "Kasalukuyang inaaksyunan ng munisipyo"}
-                  </p>
-                </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                  {isEn ? "Community Problem Tracker" : "Subaybayan ang mga Problema"}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {isEn ? "Verified civic work orders in Taytay, Rizal" : "Mga ulat na inaaksyunan ng munisipyo"}
+                </p>
+              </div>
 
-                {/* Filter Pills */}
+              {/* SEARCH BAR (Direct Ticket / Keyword Lookup) */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={
+                    isEn
+                      ? "Search ticket # (e.g., TAY-1042) or keyword..."
+                      : "I-search ang ticket # o keyword..."
+                  }
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl py-2.5 pl-9 pr-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950 shadow-sm font-medium"
+                />
+                <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-700 font-bold"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Filter Feed:
+                </span>
                 <div className="flex gap-1 bg-slate-200 p-1 rounded-lg text-[10px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setFeedFilter("all")}
+                    className={`px-2.5 py-1 rounded transition ${
+                      feedFilter === "all" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600"
+                    }`}
+                  >
+                    {isEn ? "All" : "Lahat"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setFeedFilter("in_progress")}
                     className={`px-2.5 py-1 rounded transition ${
-                      feedFilter === "in_progress"
-                        ? "bg-amber-400 text-slate-950 shadow-sm"
-                        : "text-slate-600"
+                      feedFilter === "in_progress" ? "bg-amber-400 text-slate-950 shadow-sm" : "text-slate-600"
                     }`}
                   >
                     {isEn ? "Active" : "Aktibo"}
@@ -382,23 +433,10 @@ export default function ReportProblemPage() {
                     type="button"
                     onClick={() => setFeedFilter("resolved")}
                     className={`px-2.5 py-1 rounded transition ${
-                      feedFilter === "resolved"
-                        ? "bg-emerald-600 text-white shadow-sm"
-                        : "text-slate-600"
+                      feedFilter === "resolved" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600"
                     }`}
                   >
                     {isEn ? "Resolved" : "Nagawa Na"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFeedFilter("all")}
-                    className={`px-2.5 py-1 rounded transition ${
-                      feedFilter === "all"
-                        ? "bg-slate-900 text-white shadow-sm"
-                        : "text-slate-600"
-                    }`}
-                  >
-                    {isEn ? "All" : "Lahat"}
                   </button>
                 </div>
               </div>
@@ -411,21 +449,22 @@ export default function ReportProblemPage() {
                 <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-xs text-slate-500 space-y-2">
                   <div className="text-2xl">📋</div>
                   <div className="font-bold text-slate-800">
-                    {isEn ? "No incident reports logged yet." : "Wala pang naiuulat na problema."}
+                    {isEn ? "No matching work orders found." : "Walang nahanap na ulat."}
                   </div>
                   <p>
                     {isEn
-                      ? "Be the first to submit an incident for your barangay!"
-                      : "Maging una sa pag-ulat ng problema sa inyong barangay!"}
+                      ? "Check your ticket number search or switch filters."
+                      : "Pakitingnan ang ticket number o subukan ang ibang filter."}
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   {filteredFeed.map((report) => (
                     <div
                       key={report.id}
-                      className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2.5"
+                      className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3"
                     >
+                      {/* Ticket Header & Status Badge */}
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-mono font-black text-slate-900">
@@ -436,43 +475,86 @@ export default function ReportProblemPage() {
                           </span>
                         </div>
 
-                        {/* Status Badge */}
                         {report.status === "in_progress" && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
                             ⚡ IN PROGRESS
                           </span>
                         )}
                         {report.status === "resolved" && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
                             ✓ RESOLVED
                           </span>
                         )}
                         {report.status === "submitted" && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300">
+                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300">
                             📩 SUBMITTED
                           </span>
                         )}
                       </div>
 
-                      {/* Photo Thumbnail if uploaded */}
-                      {report.photo_url && (
-                        <img
-                          src={report.photo_url}
-                          alt="Incident proof"
-                          className="w-full h-36 object-cover rounded-lg border border-slate-100"
-                        />
-                      )}
-
+                      {/* Citizen Description */}
                       <p className="text-xs font-medium text-slate-800 leading-snug">
                         "{report.description}"
                       </p>
 
+                      {/* BEFORE & AFTER PHOTO DISPLAY */}
+                      <div className={`grid ${report.status === "resolved" && report.resolution_photo_url ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
+                        {report.photo_url && (
+                          <div>
+                            <div className="text-[9px] font-bold uppercase text-slate-500 mb-0.5">
+                              {report.status === "resolved" ? "📷 Before (Citizen Report)" : "📷 Citizen Photo"}
+                            </div>
+                            <img
+                              src={report.photo_url}
+                              alt="Citizen evidence"
+                              className="w-full h-32 object-cover rounded-lg border border-slate-200"
+                            />
+                          </div>
+                        )}
+
+                        {report.status === "resolved" && report.resolution_photo_url && (
+                          <div>
+                            <div className="text-[9px] font-bold uppercase text-emerald-700 mb-0.5">
+                              ✓ After (Resolution Proof)
+                            </div>
+                            <img
+                              src={report.resolution_photo_url}
+                              alt="Resolution proof"
+                              className="w-full h-32 object-cover rounded-lg border-2 border-emerald-500 shadow-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ACTION TAKEN NOTE (When Resolved) */}
+                      {report.status === "resolved" && report.resolution_note && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs text-emerald-950 space-y-0.5">
+                          <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                            <span>🏛️</span>
+                            <span>Official Action Taken by LGU:</span>
+                          </div>
+                          <p className="text-xs font-medium leading-relaxed">
+                            "{report.resolution_note}"
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Meralco Pole Badge if applicable */}
                       {report.meralco_pole_id && (
                         <div className="text-[10px] font-mono text-amber-800 bg-amber-50 px-2 py-1 rounded inline-block border border-amber-200">
                           ⚡ Meralco Pole / Bill: {report.meralco_pole_id}
                         </div>
                       )}
 
+                      {/* Assigned Unit (If In Progress) */}
+                      {report.status === "in_progress" && report.assigned_department && (
+                        <div className="text-[11px] font-bold text-amber-800 bg-amber-50/80 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
+                          <span>⚡ Assigned Crew:</span>
+                          <span className="font-normal text-slate-800">{report.assigned_department}</span>
+                        </div>
+                      )}
+
+                      {/* Landmark & Metadata Footer */}
                       <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
                         <span>📍 {report.landmark || "Taytay, Rizal"}</span>
                         <span className="text-[10px] text-slate-400">
@@ -480,9 +562,8 @@ export default function ReportProblemPage() {
                         </span>
                       </div>
 
-                      {/* Verified Citizen Byline */}
                       <div className="text-[10px] text-slate-400 flex justify-between items-center">
-                        <span>Reported by: {report.citizen_name || "Concerned Taytayeño"}</span>
+                        <span>Reported by: {report.citizen_name || "Taytayeño"}</span>
                         <span className="text-emerald-700 font-bold">● Public Works Logged</span>
                       </div>
                     </div>
@@ -520,7 +601,6 @@ export default function ReportProblemPage() {
                   #{submittedTicket}
                 </div>
 
-                {/* 3-Step Lifecycle Indicator */}
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-200 text-center">
                   <div className="space-y-1">
                     <div className="w-5 h-5 rounded-full bg-blue-600 mx-auto text-[10px] text-white flex items-center justify-center font-bold">
@@ -588,7 +668,6 @@ export default function ReportProblemPage() {
                 </p>
               </div>
 
-              {/* Error Banner */}
               {submitError && (
                 <div className="bg-red-50 border border-red-300 text-red-800 text-xs p-3.5 rounded-xl font-medium">
                   {submitError}
@@ -672,7 +751,7 @@ export default function ReportProblemPage() {
                 </div>
               </div>
 
-              {/* KUYA ARCHIE'S UTILITY RULE: CONDITIONAL MERALCO POLE ID */}
+              {/* KUYA ARCHIE'S UTILITY RULE */}
               {category === "busted_streetlight" && (
                 <div className="space-y-1.5 bg-amber-50/80 p-3.5 rounded-xl border border-amber-200">
                   <label className="block text-xs font-bold text-amber-950">
@@ -693,7 +772,7 @@ export default function ReportProblemPage() {
                 </div>
               )}
 
-              {/* STEP 3: BARANGAY SELECTION (Staff decide escalation level, not citizen) */}
+              {/* STEP 3: BARANGAY SELECTION */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                   {isEn ? "Select Barangay in Taytay *" : "Piliin ang Barangay sa Taytay *"}
@@ -792,7 +871,7 @@ export default function ReportProblemPage() {
                 />
               </div>
 
-              {/* STEP 6: MOBILE NUMBER (FOR ARTA COMPLIANT SMS UPDATES) */}
+              {/* STEP 6: MOBILE NUMBER */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                   {isEn ? "Mobile Phone Number (+63) *" : "Cellphone Number para sa SMS Update *"}
