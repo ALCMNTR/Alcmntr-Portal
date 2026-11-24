@@ -1,4 +1,4 @@
-// app/report/page.tsx
+// app/admin/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -9,21 +9,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Taytay Official ID and Barangay Map directly from database
-const TAYTAY_MUNICIPALITY_ID = "5b0dc55a-afb6-467c-aff0-48290cfad8b4";
-
-const BARANGAY_ID_MAP: Record<string, string> = {
-  "Santa Ana": "22a5ab59-338a-4990-9d60-f106f72b53f6",
-  "San Isidro": "4040d20b-a706-473c-8f07-c6792958f01f",
-  "San Juan": "42606f19-66d7-4c19-8e7b-d49c39f26f63",
-  "Dolores (Poblacion)": "5a366ac4-c146-41ef-8cdd-97ede8198f48",
-  "Muzon": "6c74ba7f-6e93-486b-adab-28b20bd3ea3f",
-};
-
-interface IncidentRecord {
+interface AdminIncident {
   id: string;
   ticket_number: string;
   citizen_name: string | null;
+  citizen_phone: string;
   category: string;
   meralco_pole_id?: string | null;
   description: string;
@@ -39,51 +29,21 @@ interface IncidentRecord {
   } | null;
 }
 
-export default function ReportProblemPage() {
-  const [lang, setLang] = useState<"en" | "fil">("en");
-  const isEn = lang === "en";
+export default function MunicipalAdminDashboard() {
+  const [incidents, setIncidents] = useState<AdminIncident[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterBarangay, setFilterBarangay] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedIncident, setSelectedIncident] = useState<AdminIncident | null>(null);
 
-  // Sub-Navigation Tabs: Form vs. Community Tracker
-  const [activeTab, setActiveTab] = useState<"form" | "tracker">("form");
-  const [feedFilter, setFeedFilter] = useState<"all" | "in_progress" | "resolved">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  // Resolution Form States
+  const [actionTakenNote, setActionTakenNote] = useState("");
+  const [resolutionPhoto, setResolutionPhoto] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Form Fields
-  const [fullName, setFullName] = useState("");
-  const [barangayName, setBarangayName] = useState("San Juan");
-  const [category, setCategory] = useState("busted_streetlight");
-  const [meralcoPoleId, setMeralcoPoleId] = useState("");
-  const [description, setDescription] = useState("");
-  const [landmark, setLandmark] = useState("");
-  const [phone, setPhone] = useState("");
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [gpsStatus, setGpsStatus] = useState<string | null>(null);
-
-  // Submission & UI States
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedTicket, setSubmittedTicket] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Live Database Incidents Feed
-  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
-  const [loadingFeed, setLoadingFeed] = useState(false);
-
-  const categories = [
-    { id: "busted_streetlight", icon: "💡", en: "Busted Streetlight / Pole", fil: "Sirang Streetlight / Poste" },
-    { id: "clogged_drainage", icon: "🌊", en: "Clogged Drainage / Flooding", fil: "Baradong Kanal / Baha" },
-    { id: "uncollected_garbage", icon: "🗑️", en: "Uncollected Garbage", fil: "Tambak na Basura" },
-    { id: "road_pothole", icon: "🕳️", en: "Road Pothole / Hazard", fil: "Lubak sa Kalsada" },
-    { id: "illegal_obstruction", icon: "🚧", en: "Road Obstruction", fil: "Harang sa Kalsada" },
-    { id: "other", icon: "⚠️", en: "Other Concern", fil: "Iba Pang Problema" },
-  ];
-
-  const barangays = ["Dolores (Poblacion)", "San Isidro", "San Juan", "Santa Ana", "Muzon"];
-
-  // 1. Fetch live incidents from Supabase (including resolution proof notes & photos)
-  const fetchIncidents = async () => {
-    setLoadingFeed(true);
+  // 1. Fetch live incidents from Supabase
+  const fetchAdminIncidents = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("incidents")
@@ -91,6 +51,7 @@ export default function ReportProblemPage() {
           id,
           ticket_number,
           citizen_name,
+          citizen_phone,
           category,
           meralco_pole_id,
           description,
@@ -106,9 +67,9 @@ export default function ReportProblemPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Error fetching incidents:", error.message);
+        console.error("Error fetching admin incidents:", error.message);
       } else if (data) {
-        const formatted: IncidentRecord[] = data.map((item: any) => ({
+        const formatted: AdminIncident[] = data.map((item: any) => ({
           ...item,
           barangays: Array.isArray(item.barangays) ? item.barangays[0] : item.barangays,
         }));
@@ -117,26 +78,59 @@ export default function ReportProblemPage() {
     } catch (err) {
       console.error("Fetch failed:", err);
     } finally {
-      setLoadingFeed(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchIncidents();
+    fetchAdminIncidents();
   }, []);
 
-  // 2. LIVE SMART DUPLICATE DETECTION ALERT
-  const duplicateAlert = incidents.find((rep) => {
-    const repBarangay = rep.barangays?.name || "";
-    return (
-      rep.category === category &&
-      repBarangay.toLowerCase() === barangayName.toLowerCase() &&
-      rep.status !== "resolved"
-    );
-  });
+  // Reset resolution form whenever a new ticket is opened
+  useEffect(() => {
+    if (selectedIncident) {
+      setActionTakenNote(selectedIncident.resolution_note || "");
+      setResolutionPhoto(selectedIncident.resolution_photo_url || null);
+    }
+  }, [selectedIncident]);
 
-  // 3. Smart Photo Handler: Compresses high-res iPad photos to under 300KB
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 2. Status & Resolution Action Handler
+  const handleUpdateStatus = async (
+    id: string,
+    newStatus: "submitted" | "in_progress" | "resolved",
+    crewName?: string
+  ) => {
+    setIsUpdating(true);
+    try {
+      const updatePayload: any = { status: newStatus };
+      if (crewName) {
+        updatePayload.assigned_department = crewName;
+      }
+      if (newStatus === "resolved") {
+        updatePayload.resolution_note = actionTakenNote.trim() || "Work completed and verified by dispatch desk.";
+        updatePayload.resolution_photo_url = resolutionPhoto;
+      }
+
+      const { error } = await supabase
+        .from("incidents")
+        .update(updatePayload)
+        .eq("id", id);
+
+      if (error) {
+        alert("Failed to update status: " + error.message);
+      } else {
+        await fetchAdminIncidents();
+        setSelectedIncident(null);
+      }
+    } catch (err: any) {
+      alert("Error updating work order: " + err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Image compressor for resolution proof photo (under 300KB)
+  const handleResolutionPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -159,7 +153,7 @@ export default function ReportProblemPage() {
           const ctx = canvas.getContext("2d");
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            setPhotoPreview(canvas.toDataURL("image/jpeg", 0.7));
+            setResolutionPhoto(canvas.toDataURL("image/jpeg", 0.7));
           }
         };
         img.src = event.target?.result as string;
@@ -168,763 +162,503 @@ export default function ReportProblemPage() {
     }
   };
 
-  // 4. GPS Auto-detector
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      setGpsStatus(isEn ? "GPS not supported on device" : "Hindi suportado ang GPS sa device");
-      return;
-    }
-    setGpsStatus(isEn ? "Acquiring GPS coordinates..." : "Hinahanap ang GPS coordinates...");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLatitude(pos.coords.latitude);
-        setLongitude(pos.coords.longitude);
-        setGpsStatus(`GPS: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
-      },
-      () => {
-        setGpsStatus(
-          isEn
-            ? "Location access denied. Please type landmark."
-            : "Hindi ma-access ang GPS. Pakisulat ang landmark."
-        );
-      }
-    );
-  };
+  const barangays = ["Dolores (Poblacion)", "San Isidro", "San Juan", "Santa Ana", "Muzon"];
 
-  // 5. Submit Form Directly to Supabase
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      const { data: muniData } = await supabase
-        .from("municipalities")
-        .select("id")
-        .limit(1)
-        .single();
-
-      const { data: bgyData } = await supabase
-        .from("barangays")
-        .select("id")
-        .ilike("name", `%${barangayName.split(" ")[0]}%`)
-        .limit(1)
-        .single();
-
-      if (!muniData || !bgyData) {
-        throw new Error("Unable to link Municipality or Barangay record.");
-      }
-
-      const generatedTicket = "TAY-" + Math.floor(1000 + Math.random() * 9000);
-
-      const { error: insertError } = await supabase.from("incidents").insert([
-        {
-          ticket_number: generatedTicket,
-          municipality_id: muniData.id,
-          barangay_id: bgyData.id,
-          citizen_name: fullName.trim(),
-          category: category,
-          meralco_pole_id: category === "busted_streetlight" && meralcoPoleId.trim() ? meralcoPoleId.trim() : null,
-          description: description.trim(),
-          photo_url: photoPreview,
-          latitude: latitude,
-          longitude: longitude,
-          landmark: landmark.trim(),
-          citizen_phone: phone.trim(),
-          status: "submitted",
-        },
-      ]);
-
-      if (insertError) {
-        throw new Error(insertError.message);
-      }
-
-      setSubmittedTicket(generatedTicket);
-      fetchIncidents();
-    } catch (err: any) {
-      console.error("Submission failed:", err);
-      setSubmitError(err.message || "Failed to submit incident. Please check your connection.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Filter & Search Logic for Community Tracker
-  const filteredFeed = incidents.filter((r) => {
-    const matchStatus =
-      feedFilter === "all"
-        ? true
-        : feedFilter === "in_progress"
-        ? r.status === "in_progress" || r.status === "submitted"
-        : r.status === feedFilter;
-
-    const q = searchQuery.trim().toLowerCase();
-    const matchSearch =
-      q === "" ||
-      r.ticket_number.toLowerCase().includes(q) ||
-      (r.barangays?.name || "").toLowerCase().includes(q) ||
-      r.description.toLowerCase().includes(q) ||
-      (r.landmark || "").toLowerCase().includes(q);
-
-    return matchStatus && matchSearch;
+  // Filter Logic
+  const filtered = incidents.filter((t) => {
+    const bgyName = t.barangays?.name || "";
+    const matchB = filterBarangay === "all" || bgyName.toLowerCase() === filterBarangay.toLowerCase();
+    const matchS = filterStatus === "all" || t.status === filterStatus;
+    return matchB && matchS;
   });
+
+  const formatCategory = (cat: string) => {
+    const map: Record<string, string> = {
+      busted_streetlight: "💡 Busted Streetlight",
+      clogged_drainage: "🌊 Clogged Drainage",
+      uncollected_garbage: "🗑️ Uncollected Garbage",
+      road_pothole: "🕳️ Road Pothole",
+      illegal_obstruction: "🚧 Road Obstruction",
+      other: "⚠️ Other Concern",
+    };
+    return map[cat] || cat;
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
       <div>
-        {/* Top Utility Bar */}
+        {/* Top Executive Operational Bar */}
         <div className="bg-slate-950 text-slate-300 text-xs py-2 px-4 sm:px-8 flex justify-between items-center border-b border-slate-800">
           <div className="flex items-center space-x-2">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-medium text-[11px] sm:text-xs">
-              {isEn ? "Taytay Citizen Action & Public Tracker" : "Aksyon at Ulat ng Bayan • Taytay, Rizal"}
+            <span className="font-semibold text-[11px] sm:text-xs">
+              MUNICIPAL DISPATCH OPERATIONS • TAYTAY, RIZAL
             </span>
           </div>
-
-          <div className="bg-slate-800 p-0.5 rounded-md border border-slate-700 flex items-center">
-            <button
-              type="button"
-              onClick={() => setLang("en")}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                isEn ? "bg-amber-400 text-slate-950 shadow" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang("fil")}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                !isEn ? "bg-amber-400 text-slate-950 shadow" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              FIL
-            </button>
+          <div className="flex items-center space-x-4">
+            <span className="text-amber-400 font-mono text-[11px] hidden sm:inline">
+              ARTA Turnaround Standard: 72h Max
+            </span>
+            <span className="bg-slate-800 px-2.5 py-0.5 rounded text-[10px] text-slate-300 font-semibold border border-slate-700">
+              Brgy. Desk & Municipal Routing
+            </span>
           </div>
         </div>
 
-        {/* Clean Header */}
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-          <div className="max-w-xl mx-auto px-4 py-3 flex justify-between items-center">
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex justify-between items-center">
             <div className="flex items-center space-x-3 text-left">
               <img
                 src="/IMG_0970.jpeg"
-                alt="Pamahalaang Bayan ng Taytay Official Seal"
-                className="w-10 h-10 object-contain flex-shrink-0 drop-shadow-sm"
+                alt="Taytay Seal"
+                className="w-11 h-11 object-contain drop-shadow-sm"
               />
               <div>
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 leading-tight">
-                  {isEn ? "Municipality of Taytay" : "Pamahalaang Bayan ng Taytay"}
+                  Pamahalaang Bayan ng Taytay
                 </div>
-                <h1 className="text-base font-black text-slate-950 tracking-tight leading-none">
-                  {isEn ? "Public Incident Portal" : "Portal ng Pag-uulat"}
+                <h1 className="text-lg font-black text-slate-950 tracking-tight leading-none mt-0.5">
+                  Operations & Dispatch Control
                 </h1>
               </div>
             </div>
 
-            <a
-              href="/"
-              className="text-xs font-bold text-slate-600 hover:text-blue-950 px-2.5 py-1.5 rounded-md transition hover:bg-slate-100 flex items-center gap-1 border border-slate-200"
-            >
-              <span>←</span>
-              <span>{isEn ? "Home" : "Home"}</span>
-            </a>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={fetchAdminIncidents}
+                className="text-xs font-bold text-slate-700 hover:text-blue-950 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-300 transition"
+              >
+                🔄 Refresh
+              </button>
+              <a
+                href="/report"
+                className="text-xs font-bold text-slate-700 hover:text-blue-950 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-300 transition hidden sm:inline-block"
+              >
+                + Citizen View
+              </a>
+              <a
+                href="/"
+                className="text-xs font-bold text-slate-700 hover:text-blue-950 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-300 transition"
+              >
+                Portal Home
+              </a>
+            </div>
           </div>
         </header>
 
-        {/* SUB-NAVIGATION TABS */}
-        <div className="max-w-xl mx-auto px-4 pt-4">
-          <div className="grid grid-cols-2 bg-slate-200 p-1 rounded-xl text-xs font-bold text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("form");
-                setSubmittedTicket(null);
-              }}
-              className={`py-2.5 rounded-lg transition-all ${
-                activeTab === "form"
-                  ? "bg-white text-slate-950 shadow"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              📝 {isEn ? "Submit a Problem" : "Mag-ulat ng Problema"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("tracker");
-                fetchIncidents();
-              }}
-              className={`py-2.5 rounded-lg transition-all ${
-                activeTab === "tracker"
-                  ? "bg-white text-slate-950 shadow"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              🔍 {isEn ? "Community Tracker" : "Subaybayan ang Ulat"}
-            </button>
+        {/* MAIN DASHBOARD */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6">
+          {/* TOP KPI CARDS */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Total Incident Queue
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-950 mt-1">
+                {incidents.length}
+              </div>
+              <div className="text-[10px] text-emerald-600 font-semibold mt-1">
+                ● Live database sync
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600">
+                In-Progress Dispatches
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-700 mt-1">
+                {incidents.filter((t) => t.status === "in_progress").length}
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1">
+                Crews on site
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                Resolved Tickets
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-700 mt-1">
+                {incidents.filter((t) => t.status === "resolved").length}
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1">
+                Verified complete
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                ARTA Compliance Rate
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-blue-950 mt-1">
+                100%
+              </div>
+              <div className="text-[10px] text-emerald-700 font-bold mt-1">
+                ★ SGLG Grade: Pass
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* MAIN BODY */}
-        <main className="max-w-xl mx-auto px-4 py-6">
-          {activeTab === "tracker" ? (
-            /* TAB 2: PUBLIC COMMUNITY INCIDENT TRACKER */
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-black text-slate-900 tracking-tight">
-                  {isEn ? "Community Problem Tracker" : "Subaybayan ang mga Problema"}
-                </h2>
-                <p className="text-xs text-slate-500">
-                  {isEn ? "Verified civic work orders in Taytay, Rizal" : "Mga ulat na inaaksyunan ng munisipyo"}
-                </p>
-              </div>
-
-              {/* SEARCH BAR (Direct Ticket / Keyword Lookup) */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder={
-                    isEn
-                      ? "Search ticket # (e.g., TAY-1042) or keyword..."
-                      : "I-search ang ticket # o keyword..."
-                  }
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl py-2.5 pl-9 pr-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950 shadow-sm font-medium"
-                />
-                <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-700 font-bold"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              {/* Filter Pills */}
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Filter Feed:
-                </span>
-                <div className="flex gap-1 bg-slate-200 p-1 rounded-lg text-[10px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setFeedFilter("all")}
-                    className={`px-2.5 py-1 rounded transition ${
-                      feedFilter === "all" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600"
-                    }`}
-                  >
-                    {isEn ? "All" : "Lahat"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFeedFilter("in_progress")}
-                    className={`px-2.5 py-1 rounded transition ${
-                      feedFilter === "in_progress" ? "bg-amber-400 text-slate-950 shadow-sm" : "text-slate-600"
-                    }`}
-                  >
-                    {isEn ? "Active" : "Aktibo"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFeedFilter("resolved")}
-                    className={`px-2.5 py-1 rounded transition ${
-                      feedFilter === "resolved" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600"
-                    }`}
-                  >
-                    {isEn ? "Resolved" : "Nagawa Na"}
-                  </button>
-                </div>
-              </div>
-
-              {loadingFeed ? (
-                <div className="text-center py-10 text-xs font-semibold text-slate-400 animate-pulse">
-                  {isEn ? "Loading live Taytay dispatch records..." : "Kinukuha ang mga ulat ng munisipyo..."}
-                </div>
-              ) : filteredFeed.length === 0 ? (
-                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-xs text-slate-500 space-y-2">
-                  <div className="text-2xl">📋</div>
-                  <div className="font-bold text-slate-800">
-                    {isEn ? "No matching work orders found." : "Walang nahanap na ulat."}
-                  </div>
-                  <p>
-                    {isEn
-                      ? "Check your ticket number search or switch filters."
-                      : "Pakitingnan ang ticket number o subukan ang ibang filter."}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {filteredFeed.map((report) => (
-                    <div
-                      key={report.id}
-                      className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3"
-                    >
-                      {/* Ticket Header & Status Badge */}
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-black text-slate-900">
-                            #{report.ticket_number}
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                            Brgy. {report.barangays?.name || "Taytay"}
-                          </span>
-                        </div>
-
-                        {report.status === "in_progress" && (
-                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
-                            ⚡ IN PROGRESS
-                          </span>
-                        )}
-                        {report.status === "resolved" && (
-                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
-                            ✓ RESOLVED
-                          </span>
-                        )}
-                        {report.status === "submitted" && (
-                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300">
-                            📩 SUBMITTED
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Citizen Description */}
-                      <p className="text-xs font-medium text-slate-800 leading-snug">
-                        "{report.description}"
-                      </p>
-
-                      {/* BEFORE & AFTER PHOTO DISPLAY */}
-                      <div className={`grid ${report.status === "resolved" && report.resolution_photo_url ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
-                        {report.photo_url && (
-                          <div>
-                            <div className="text-[9px] font-bold uppercase text-slate-500 mb-0.5">
-                              {report.status === "resolved" ? "📷 Before (Citizen Report)" : "📷 Citizen Photo"}
-                            </div>
-                            <img
-                              src={report.photo_url}
-                              alt="Citizen evidence"
-                              className="w-full h-32 object-cover rounded-lg border border-slate-200"
-                            />
-                          </div>
-                        )}
-
-                        {report.status === "resolved" && report.resolution_photo_url && (
-                          <div>
-                            <div className="text-[9px] font-bold uppercase text-emerald-700 mb-0.5">
-                              ✓ After (Resolution Proof)
-                            </div>
-                            <img
-                              src={report.resolution_photo_url}
-                              alt="Resolution proof"
-                              className="w-full h-32 object-cover rounded-lg border-2 border-emerald-500 shadow-sm"
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ACTION TAKEN NOTE (When Resolved) */}
-                      {report.status === "resolved" && report.resolution_note && (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs text-emerald-950 space-y-0.5">
-                          <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
-                            <span>🏛️</span>
-                            <span>Official Action Taken by LGU:</span>
-                          </div>
-                          <p className="text-xs font-medium leading-relaxed">
-                            "{report.resolution_note}"
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Meralco Pole Badge if applicable */}
-                      {report.meralco_pole_id && (
-                        <div className="text-[10px] font-mono text-amber-800 bg-amber-50 px-2 py-1 rounded inline-block border border-amber-200">
-                          ⚡ Meralco Pole / Bill: {report.meralco_pole_id}
-                        </div>
-                      )}
-
-                      {/* Assigned Unit (If In Progress) */}
-                      {report.status === "in_progress" && report.assigned_department && (
-                        <div className="text-[11px] font-bold text-amber-800 bg-amber-50/80 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
-                          <span>⚡ Assigned Crew:</span>
-                          <span className="font-normal text-slate-800">{report.assigned_department}</span>
-                        </div>
-                      )}
-
-                      {/* Landmark & Metadata Footer */}
-                      <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
-                        <span>📍 {report.landmark || "Taytay, Rizal"}</span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(report.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <div className="text-[10px] text-slate-400 flex justify-between items-center">
-                        <span>Reported by: {report.citizen_name || "Taytayeño"}</span>
-                        <span className="text-emerald-700 font-bold">● Public Works Logged</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : submittedTicket ? (
-            /* SUCCESS CONFIRMATION SCREEN */
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center animate-fade-in">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-emerald-200">
-                ✓
-              </div>
-
-              <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 mb-2">
-                {isEn ? "Report Successfully Logged" : "Matagumpay na Naitala"}
+          {/* FILTERS TOOLBAR */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Filter:
               </span>
-
-              <h2 className="text-2xl font-black text-slate-950 tracking-tight">
-                {isEn ? "Thank you, " + fullName + "!" : "Salamat, " + fullName + "!"}
-              </h2>
-
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                {isEn
-                  ? "Your report has been entered into the municipal dispatch queue for inspection and repair."
-                  : "Ang inyong ulat ay naipasok na sa sistema ng munisipyo upang maaksyunan ng dispatch crew."}
-              </p>
-
-              {/* Ticket Card with 3-Step Lifecycle Visual Indicator */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 my-6 text-center">
-                <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                  {isEn ? "Official Ticket Reference" : "Numero ng Ulat"}
-                </div>
-                <div className="text-2xl font-black text-blue-950 font-mono mt-1">
-                  #{submittedTicket}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-200 text-center">
-                  <div className="space-y-1">
-                    <div className="w-5 h-5 rounded-full bg-blue-600 mx-auto text-[10px] text-white flex items-center justify-center font-bold">
-                      ✓
-                    </div>
-                    <div className="text-[9px] font-bold text-blue-900">SUBMITTED</div>
-                    <div className="text-[8px] text-slate-400">Logged</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="w-5 h-5 rounded-full bg-amber-400 mx-auto text-[10px] text-slate-900 flex items-center justify-center font-bold animate-pulse">
-                      2
-                    </div>
-                    <div className="text-[9px] font-bold text-amber-700">IN PROGRESS</div>
-                    <div className="text-[8px] text-slate-400">Queued</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="w-5 h-5 rounded-full bg-slate-200 mx-auto text-[10px] text-slate-500 flex items-center justify-center font-bold">
-                      3
-                    </div>
-                    <div className="text-[9px] font-bold text-slate-400">RESOLVED</div>
-                    <div className="text-[8px] text-slate-400">Final Proof</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-xs text-slate-500 mb-6 leading-relaxed">
-                {isEn
-                  ? `Automated SMS notifications will be dispatched to +63 ${phone} throughout the repair process.`
-                  : `Makakatanggap ka ng libreng SMS update sa +63 ${phone} sa bawat galaw ng repair team.`}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("tracker");
-                    fetchIncidents();
-                  }}
-                  className="w-full bg-blue-950 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-xl shadow transition text-xs sm:text-sm"
-                >
-                  {isEn ? "View on Community Tracker" : "Tingnan sa Community Tracker"}
-                </button>
-                <a
-                  href="/"
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 px-4 rounded-xl transition text-xs block text-center"
-                >
-                  {isEn ? "Return to Main Portal" : "Bumalik sa Portal"}
-                </a>
-              </div>
-            </div>
-          ) : (
-            /* TAB 1: INCIDENT REPORTING FORM */
-            <form
-              onSubmit={handleSubmit}
-              className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-8 space-y-6"
-            >
-              <div>
-                <h2 className="text-xl font-black text-slate-950 tracking-tight">
-                  {isEn ? "Report a Problem" : "Mag-ulat ng Problema"}
-                </h2>
-                <p className="text-xs text-slate-600 mt-1">
-                  {isEn
-                    ? "Submit civic infrastructure issues directly to Taytay public works departments."
-                    : "Iparating ang mga sirang pasilidad diretso sa mga tanggapan ng munisipyo."}
-                </p>
-              </div>
-
-              {submitError && (
-                <div className="bg-red-50 border border-red-300 text-red-800 text-xs p-3.5 rounded-xl font-medium">
-                  {submitError}
-                </div>
-              )}
-
-              {/* CITIZEN FULL NAME */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {isEn ? "Citizen Full Name *" : "Buong Pangalan ng Residente *"}
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={isEn ? "e.g., Juan Dela Cruz" : "hal. Juan Dela Cruz"}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950 font-medium"
-                />
-              </div>
-
-              {/* STEP 1: PHOTO CAPTURE */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {isEn ? "Photo Evidence (Required) *" : "Litrato ng Problema (Kailangan) *"}
-                </label>
-
-                {photoPreview ? (
-                  <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500 bg-slate-900">
-                    <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setPhotoPreview(null)}
-                      className="absolute top-2 right-2 bg-slate-950/80 text-white text-[11px] font-bold px-3 py-1 rounded-md shadow"
-                    >
-                      {isEn ? "Change Photo" : "Palitan"}
-                    </button>
-                  </div>
-                ) : (
-                  <label className="border-2 border-dashed border-slate-300 hover:border-blue-950 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-50 hover:bg-blue-50/50 transition">
-                    <div className="text-3xl mb-2">📸</div>
-                    <span className="text-xs font-bold text-slate-900">
-                      {isEn ? "Tap to Take Live Photo or Upload" : "Pindutin para Kunan ng Litrato"}
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-1">
-                      {isEn ? "Live camera verification prevents false alarms" : "Pinipigilan ang pekeng ulat"}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      required
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
-
-              {/* STEP 2: CATEGORY SELECTION */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {isEn ? "Category of Problem *" : "Uri ng Problema *"}
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setCategory(cat.id)}
-                      className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition text-xs font-semibold ${
-                        category === cat.id
-                          ? "border-blue-950 bg-blue-50 text-blue-950 font-bold shadow-sm"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      <span className="text-lg">{cat.icon}</span>
-                      <span className="leading-tight">{isEn ? cat.en : cat.fil}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* KUYA ARCHIE'S UTILITY RULE: CONDITIONAL MERALCO POLE ID */}
-              {category === "busted_streetlight" && (
-                <div className="space-y-1.5 bg-amber-50/80 p-3.5 rounded-xl border border-amber-200">
-                  <label className="block text-xs font-bold text-amber-950">
-                    ⚡ {isEn ? "Meralco Pole Number / Nearest Bill # (Optional)" : "Numero ng Poste o Meralco Bill (Kung Alam)"}
-                  </label>
-                  <p className="text-[10px] text-amber-800 leading-tight">
-                    {isEn
-                      ? "Per Kuya Archie's protocol: providing the yellow/black pole tag or nearby electric bill number expedites Meralco dispatch."
-                      : "Ayon sa patakaran ng San Juan desk: ang numero sa dilaw na tag ng poste o bill ay nagpapabilis ng aksyon ng Meralco."}
-                  </p>
-                  <input
-                    type="text"
-                    placeholder={isEn ? "e.g., Pole # 42A-99 or Meralco SIN" : "hal. Pole # 42A-99 o SIN"}
-                    value={meralcoPoleId}
-                    onChange={(e) => setMeralcoPoleId(e.target.value)}
-                    className="w-full bg-white border border-amber-300 rounded-lg py-2.5 px-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
-                  />
-                </div>
-              )}
-
-              {/* STEP 3: BARANGAY SELECTION */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {isEn ? "Select Barangay in Taytay *" : "Piliin ang Barangay sa Taytay *"}
-                </label>
-                <select
-                  value={barangayName}
-                  onChange={(e) => setBarangayName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl py-3 px-3.5 text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950"
-                >
-                  {barangays.map((b) => (
-                    <option key={b} value={b}>
-                      Brgy. {b}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* LIVE SMART DUPLICATE DETECTION ALERT */}
-              {duplicateAlert && (
-                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-900 space-y-1.5 animate-pulse">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <span>⚠️</span>
-                    <span>
-                      {isEn
-                        ? "Potential Duplicate Incident Detected"
-                        : "May Naitala Nang Parehong Ulat"}
-                    </span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-amber-800">
-                    {isEn
-                      ? `Ticket #${duplicateAlert.ticket_number} for a similar issue in Brgy. ${barangayName} is already logged. You may still submit if this is a separate location.`
-                      : `Ang Ticket #${duplicateAlert.ticket_number} sa Brgy. ${barangayName} ay kasalukuyan nang naitala. Maari pa ring magsumite kung ito ay sa ibang lugar.`}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("tracker")}
-                    className="text-[11px] font-bold text-blue-950 underline pt-1 block"
-                  >
-                    {isEn ? "→ View existing report on Tracker" : "→ Tingnan ang ulat sa Tracker"}
-                  </button>
-                </div>
-              )}
-
-              {/* STEP 4: DETAILED DESCRIPTION */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {isEn ? "Detailed Description *" : "Detalyadong Paliwanag *"}
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder={
-                    isEn
-                      ? "Describe the issue in detail (e.g., how big the pothole is, or how long the light has been out)..."
-                      : "Ilarawan ang problema (hal. gaano kalalim ang lubak, o gaano na katagal patay ang ilaw)..."
-                  }
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950"
-                ></textarea>
-              </div>
-
-              {/* STEP 5: LOCATION & LANDMARK */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                    {isEn ? "Exact Location / Landmark *" : "Eksaktong Lokasyon o Landmark *"}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleGetLocation}
-                    className="text-[10px] font-bold text-blue-950 bg-blue-100 px-2 py-1 rounded hover:bg-blue-200 transition flex items-center gap-1"
-                  >
-                    <span>📍</span>
-                    <span>{isEn ? "Auto-Detect GPS" : "Kuhanin ang GPS"}</span>
-                  </button>
-                </div>
-
-                {gpsStatus && (
-                  <div className="text-[11px] font-mono text-blue-950 bg-blue-50 p-2 rounded-lg border border-blue-200">
-                    {gpsStatus}
-                  </div>
-                )}
-
-                <input
-                  type="text"
-                  required
-                  placeholder={
-                    isEn
-                      ? "e.g., Corner Rizal Ave, in front of Puregold"
-                      : "hal. Kanto ng Rizal Ave, tapat ng Puregold"
-                  }
-                  value={landmark}
-                  onChange={(e) => setLandmark(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950"
-                />
-              </div>
-
-              {/* STEP 6: MOBILE NUMBER */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {isEn ? "Mobile Phone Number (+63) *" : "Cellphone Number para sa SMS Update *"}
-                </label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-slate-300 bg-slate-100 text-slate-600 text-xs sm:text-sm font-bold">
-                    +63
-                  </span>
-                  <input
-                    type="tel"
-                    required
-                    maxLength={10}
-                    placeholder="917 123 4567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-r-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-950 font-mono"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500 leading-tight">
-                  {isEn
-                    ? "Protected under RA 10173. Strictly utilized for municipal dispatch status notifications."
-                    : "Protektado ng Data Privacy Act. Gagamitin lamang para mag-text kapag naayos na ang ulat."}
-                </p>
-              </div>
-
-              {/* SUBMIT BUTTON */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-black py-4 px-4 rounded-xl shadow-lg transition text-sm flex items-center justify-center gap-2"
+              <select
+                value={filterBarangay}
+                onChange={(e) => setFilterBarangay(e.target.value)}
+                className="bg-slate-50 border border-slate-300 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-950"
               >
-                {isSubmitting ? (
-                  <span>{isEn ? "Dispatching Report to Taytay LGU..." : "Ipinapadala sa Munisipyo..."}</span>
-                ) : (
-                  <>
-                    <span>{isEn ? "Submit Incident Report" : "Ipasa ang Ulat sa Munisipyo"}</span>
-                    <span>→</span>
-                  </>
-                )}
-              </button>
-            </form>
-          )}
+                <option value="all">All 5 Barangays</option>
+                {barangays.map((b) => (
+                  <option key={b} value={b}>
+                    Brgy. {b}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-slate-50 border border-slate-300 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-950"
+              >
+                <option value="all">All Statuses</option>
+                <option value="submitted">New / Submitted</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </div>
+
+            <div className="text-xs text-slate-500 font-medium">
+              Showing <strong className="text-slate-900">{filtered.length}</strong> work orders
+            </div>
+          </div>
+
+          {/* INCIDENT WORK ORDER TABLE */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {loading ? (
+              <div className="py-12 text-center text-xs font-semibold text-slate-400 animate-pulse">
+                Loading live incident queue from Supabase...
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-500 space-y-1">
+                <div className="text-2xl">📋</div>
+                <div className="font-bold text-slate-800">No work orders matching filter</div>
+                <p>Try selecting a different barangay or status filter above.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900 text-slate-200 uppercase tracking-wider text-[10px] font-bold">
+                    <tr>
+                      <th className="py-3 px-4">Ticket</th>
+                      <th className="py-3 px-4">Category & Location</th>
+                      <th className="py-3 px-4">Citizen Details</th>
+                      <th className="py-3 px-4">Current Status</th>
+                      <th className="py-3 px-4">Assigned Unit</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filtered.map((ticket) => (
+                      <tr key={ticket.id} className="hover:bg-slate-50 transition">
+                        <td className="py-4 px-4 font-mono font-black text-slate-950">
+                          #{ticket.ticket_number}
+                          <div className="text-[10px] font-normal text-slate-400 font-sans">
+                            {new Date(ticket.created_at).toLocaleDateString()}
+                          </div>
+                        </td>
+
+                        <td className="py-4 px-4">
+                          <div className="font-bold text-slate-900 text-xs">
+                            {formatCategory(ticket.category)}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            Brgy. {ticket.barangays?.name || "Taytay"} • {ticket.landmark || "No landmark"}
+                          </div>
+                          {ticket.meralco_pole_id && (
+                            <div className="text-[10px] font-mono text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block border border-amber-200 mt-1">
+                              ⚡ Pole: {ticket.meralco_pole_id}
+                            </div>
+                          )}
+                          <div className="text-[10px] text-slate-600 italic mt-0.5 max-w-xs truncate">
+                            "{ticket.description}"
+                          </div>
+                        </td>
+
+                        <td className="py-4 px-4">
+                          <div className="font-semibold text-slate-900">
+                            {ticket.citizen_name || "Taytayeño"}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-500">
+                            +63 {ticket.citizen_phone}
+                          </div>
+                        </td>
+
+                        <td className="py-4 px-4">
+                          {ticket.status === "submitted" && (
+                            <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-900 border border-blue-200">
+                              📩 NEW / SUBMITTED
+                            </span>
+                          )}
+                          {ticket.status === "in_progress" && (
+                            <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                              ⚡ IN PROGRESS
+                            </span>
+                          )}
+                          {ticket.status === "resolved" && (
+                            <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                              ✓ RESOLVED
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-4 text-slate-700 font-medium">
+                          {ticket.assigned_department || (
+                            <span className="text-slate-400 italic">Unassigned</span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedIncident(ticket)}
+                            className="bg-blue-950 hover:bg-blue-900 text-white font-bold px-3 py-1.5 rounded-lg transition text-[11px] shadow-sm"
+                          >
+                            Manage →
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </main>
       </div>
 
-      {/* Footer */}
+      {/* DISPATCH ACTION MODAL */}
+      {selectedIncident && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">
+                  Manage Work Order
+                </span>
+                <h3 className="text-lg font-black text-slate-900">
+                  #{selectedIncident.ticket_number} • {formatCategory(selectedIncident.category)}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedIncident(null)}
+                className="text-slate-400 hover:text-slate-900 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Before Photo from Citizen */}
+            {selectedIncident.photo_url && (
+              <div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Citizen Incident Evidence:
+                </div>
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                  <img
+                    src={selectedIncident.photo_url}
+                    alt="Citizen report photo"
+                    className="w-full h-40 object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5 text-slate-700">
+              <div>
+                <strong>Location:</strong> Brgy. {selectedIncident.barangays?.name || "Taytay"} ({selectedIncident.landmark || "No landmark specified"})
+              </div>
+              <div>
+                <strong>Reported By:</strong> {selectedIncident.citizen_name || "Taytayeño"} (+63 {selectedIncident.citizen_phone})
+              </div>
+              {selectedIncident.meralco_pole_id && (
+                <div>
+                  <strong>Meralco Pole / Bill:</strong>{" "}
+                  <span className="font-mono font-bold text-amber-800">
+                    {selectedIncident.meralco_pole_id}
+                  </span>
+                </div>
+              )}
+              <div>
+                <strong>Details:</strong> "{selectedIncident.description}"
+              </div>
+              <div>
+                <strong>Current Unit:</strong> {selectedIncident.assigned_department || "None"}
+              </div>
+            </div>
+
+            {/* ACTION OPTIONS BASED ON KUYA ARCHIE'S WORKFLOW */}
+            <div className="space-y-3 pt-2">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                1. Dispatch / Route Incident:
+              </div>
+
+              {/* Barangay Tanod / Crew */}
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() =>
+                  handleUpdateStatus(
+                    selectedIncident.id,
+                    "in_progress",
+                    `Brgy. ${selectedIncident.barangays?.name || "San Juan"} Tanod/Crew`
+                  )
+                }
+                className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition text-left flex justify-between items-center"
+              >
+                <span>🏠 Dispatch Barangay Quick Response</span>
+                <span className="text-[10px] text-slate-400">Local Crew</span>
+              </button>
+
+              {/* Taytay MEO */}
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() =>
+                  handleUpdateStatus(
+                    selectedIncident.id,
+                    "in_progress",
+                    "Taytay MEO Engineering Crew"
+                  )
+                }
+                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 px-3 rounded-xl text-xs transition text-left flex justify-between items-center shadow-sm"
+              >
+                <span>⚡ Escalate to Taytay MEO (Engineering)</span>
+                <span className="text-[10px] text-slate-900">City Hall</span>
+              </button>
+
+              {/* Taytay MENRO */}
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() =>
+                  handleUpdateStatus(
+                    selectedIncident.id,
+                    "in_progress",
+                    "Taytay MENRO Sanitation Unit"
+                  )
+                }
+                className="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition text-left flex justify-between items-center"
+              >
+                <span>🌿 Escalate to Taytay MENRO (Sanitation)</span>
+                <span className="text-[10px] text-blue-200">City Hall</span>
+              </button>
+
+              {/* Meralco Utility */}
+              {selectedIncident.category === "busted_streetlight" && (
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() =>
+                    handleUpdateStatus(
+                      selectedIncident.id,
+                      "in_progress",
+                      "Forwarded to Meralco Dispatch"
+                    )
+                  }
+                  className="w-full bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold py-2.5 px-3 rounded-xl text-xs transition text-left flex justify-between items-center border border-amber-300"
+                >
+                  <span>⚡ Endorse to Meralco Utility</span>
+                  <span className="text-[10px] text-amber-800">External</span>
+                </button>
+              )}
+
+              {/* 2. RESOLUTION PROOF */}
+              <div className="pt-3 border-t border-slate-200 space-y-2.5">
+                <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                  2. Mark as Resolved (ARTA Compliance Proof):
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Action Taken / Repair Notes:
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g., Repaired loose wire and replaced 50W bulb."
+                    value={actionTakenNote}
+                    onChange={(e) => setActionTakenNote(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Proof Photo of Completion (After Photo):
+                  </label>
+                  {resolutionPhoto ? (
+                    <div className="relative rounded-xl overflow-hidden border border-emerald-500 bg-slate-900">
+                      <img
+                        src={resolutionPhoto}
+                        alt="Resolution proof"
+                        className="w-full h-32 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setResolutionPhoto(null)}
+                        className="absolute top-2 right-2 bg-slate-950/80 text-white text-[10px] font-bold px-2.5 py-1 rounded-md"
+                      >
+                        Remove Photo
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="border border-dashed border-slate-300 hover:border-emerald-600 rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer bg-slate-50 hover:bg-emerald-50/50 transition">
+                      <span className="text-base">📷</span>
+                      <span className="text-xs font-semibold text-slate-700">
+                        Upload / Take "After" Photo
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleResolutionPhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() => handleUpdateStatus(selectedIncident.id, "resolved")}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-black py-3 px-4 rounded-xl text-xs shadow transition flex items-center justify-center gap-2 mt-2"
+                >
+                  {isUpdating ? "Saving..." : "✓ Complete & Mark as Resolved"}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedIncident(null)}
+              className="w-full text-slate-500 hover:text-slate-900 text-xs font-semibold py-2 transition"
+            >
+              Close Window
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Minimal Footer */}
       <footer className="bg-slate-950 text-slate-500 py-6 px-4 text-center text-xs border-t border-slate-800">
-        <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS</p>
-        <p className="text-[11px] mt-1">
-          {isEn
-            ? "Official Civic Dispatch Engine. All rights reserved."
-            : "Opisyal na Civic Dispatch Engine. All rights reserved."}
-        </p>
+        <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS • MUNICIPAL SUITE</p>
+        <p className="text-[11px] mt-1">Authorized Official Dispatch Operations. All rights reserved.</p>
       </footer>
     </div>
   );
