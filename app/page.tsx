@@ -85,12 +85,6 @@ export default function MunicipalPortalLanding() {
               >
                 {isEn ? "About" : "Tungkol sa Amin"}
               </a>
-              <a
-                href="/report"
-                className="text-xs font-bold bg-blue-950 hover:bg-blue-900 text-white px-3.5 py-1.5 rounded-lg shadow-sm transition"
-              >
-                {isEn ? "Report Issue" : "Mag-ulat"}
-              </a>
             </nav>
           </div>
         </header>
