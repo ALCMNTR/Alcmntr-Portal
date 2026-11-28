@@ -29,9 +29,27 @@ interface AdminIncident {
   } | null;
 }
 
+interface StaffProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  department: string;
+  municipality_id: string;
+}
+
 export default function MunicipalAdminDashboard() {
+  // Authentication & Security States
+  const [currentUser, setCurrentUser] = useState<StaffProfile | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Dashboard Incident States
   const [incidents, setIncidents] = useState<AdminIncident[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [filterBarangay, setFilterBarangay] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedIncident, setSelectedIncident] = useState<AdminIncident | null>(null);
@@ -41,8 +59,85 @@ export default function MunicipalAdminDashboard() {
   const [resolutionPhoto, setResolutionPhoto] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // 1. Fetch live incidents from Supabase
+  // 1. Check existing session on page load
+  const verifyStaffBadge = async (email: string) => {
+    try {
+      const { data: staffData, error: staffError } = await supabase
+        .from("staff_users")
+        .select("*")
+        .eq("email", email.trim().toLowerCase())
+        .single();
+
+      if (staffError || !staffData || staffData.role !== "official") {
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        setAuthError("Access Denied: Account is not on the official municipal staff roster (RA 10173).");
+        return false;
+      }
+
+      setCurrentUser(staffData);
+      setAuthError(null);
+      return true;
+    } catch (err) {
+      await supabase.auth.signOut();
+      setCurrentUser(null);
+      setAuthError("Failed to verify official credentials.");
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    const checkSession = async () => {
+      setAuthChecking(true);
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user?.email) {
+        await verifyStaffBadge(data.session.user.email);
+      }
+      setAuthChecking(false);
+    };
+    checkSession();
+  }, []);
+
+  // 2. Handle Official Staff Login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    setAuthError(null);
+
+    try {
+      // Step A: Check Password Vault
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailInput.trim().toLowerCase(),
+        password: passwordInput,
+      });
+
+      if (signInError || !authData.user) {
+        throw new Error("Invalid staff email or password.");
+      }
+
+      // Step B: Check Official ID Badge
+      const isValid = await verifyStaffBadge(authData.user.email!);
+      if (!isValid) {
+        return;
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Login failed. Please check credentials.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // 3. Handle Official Logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setEmailInput("");
+    setPasswordInput("");
+  };
+
+  // 4. Fetch live incidents for this municipality
   const fetchAdminIncidents = async () => {
+    if (!currentUser) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -64,10 +159,11 @@ export default function MunicipalAdminDashboard() {
           created_at,
           barangays ( name )
         `)
+        .eq("municipality_id", currentUser.municipality_id)
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Error fetching admin incidents:", error.message);
+        console.error("Error fetching incidents:", error.message);
       } else if (data) {
         const formatted: AdminIncident[] = data.map((item: any) => ({
           ...item,
@@ -83,10 +179,11 @@ export default function MunicipalAdminDashboard() {
   };
 
   useEffect(() => {
-    fetchAdminIncidents();
-  }, []);
+    if (currentUser) {
+      fetchAdminIncidents();
+    }
+  }, [currentUser]);
 
-  // Reset resolution form whenever a new ticket is opened
   useEffect(() => {
     if (selectedIncident) {
       setActionTakenNote(selectedIncident.resolution_note || "");
@@ -94,7 +191,7 @@ export default function MunicipalAdminDashboard() {
     }
   }, [selectedIncident]);
 
-  // 2. Status & Resolution Action Handler
+  // 5. Update Status & Resolution Action
   const handleUpdateStatus = async (
     id: string,
     newStatus: "submitted" | "in_progress" | "resolved",
@@ -107,14 +204,12 @@ export default function MunicipalAdminDashboard() {
         updatePayload.assigned_department = crewName;
       }
       if (newStatus === "resolved") {
-        updatePayload.resolution_note = actionTakenNote.trim() || "Work completed and verified by dispatch desk.";
+        updatePayload.resolution_note =
+          actionTakenNote.trim() || `Work completed and verified by ${currentUser?.full_name || "desk"}.`;
         updatePayload.resolution_photo_url = resolutionPhoto;
       }
 
-      const { error } = await supabase
-        .from("incidents")
-        .update(updatePayload)
-        .eq("id", id);
+      const { error } = await supabase.from("incidents").update(updatePayload).eq("id", id);
 
       if (error) {
         alert("Failed to update status: " + error.message);
@@ -164,7 +259,6 @@ export default function MunicipalAdminDashboard() {
 
   const barangays = ["Dolores (Poblacion)", "San Isidro", "San Juan", "Santa Ana", "Muzon"];
 
-  // Filter Logic
   const filtered = incidents.filter((t) => {
     const bgyName = t.barangays?.name || "";
     const matchB = filterBarangay === "all" || bgyName.toLowerCase() === filterBarangay.toLowerCase();
@@ -184,6 +278,107 @@ export default function MunicipalAdminDashboard() {
     return map[cat] || cat;
   };
 
+  // SCREEN 1: LOADING SESSION SPINNER
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center font-sans text-xs">
+        <div className="text-center space-y-2">
+          <div className="inline-block w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+          <div>Verifying Municipal Official Credentials...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 2: THE EMPLOYEE ENTRANCE (Email & Password Login - NO SIGN UP)
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between font-sans">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center space-y-5 animate-fade-in">
+            <img
+              src="/IMG_0970.jpeg"
+              alt="Taytay Seal"
+              className="w-16 h-16 object-contain mx-auto drop-shadow-md"
+            />
+
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
+                Pamahalaang Bayan ng Taytay
+              </div>
+              <h2 className="text-xl font-black text-white tracking-tight mt-1">
+                Operations & Dispatch Control
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Authorized Municipal & Barangay Staff Login Only
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-3.5 text-left">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Official Staff Email:
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@taytay.gov.ph"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Secret Password:
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••••••"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
+                />
+              </div>
+
+              {authError && (
+                <div className="bg-red-950/80 border border-red-800 text-red-300 text-xs p-2.5 rounded-xl font-medium text-center">
+                  ⚠️ {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full bg-amber-400 hover:bg-amber-500 disabled:bg-slate-700 text-slate-950 font-black py-3 px-4 rounded-xl shadow-lg transition text-xs uppercase tracking-wider mt-2"
+              >
+                {isLoggingIn ? "Verifying Credentials..." : "🔐 Log In to Operations Control"}
+              </button>
+            </form>
+
+            <div className="border-t border-slate-800 pt-4 text-[10px] text-slate-500 leading-relaxed text-center">
+              🔒 Multi-Tenant Isolated Gateway. Protected under the Philippine Data Privacy Act (RA 10173). Unauthorized access attempts are monitored and logged.
+            </div>
+
+            <a
+              href="/"
+              className="inline-block text-xs font-semibold text-slate-400 hover:text-white transition text-center"
+            >
+              ← Return to Citizen Public Gateway
+            </a>
+          </div>
+        </div>
+
+        <footer className="py-4 text-center text-[11px] text-slate-600 border-t border-slate-900">
+          ALCMNTR GOVTECH ENGINE • MUNICIPAL ENTERPRISE EDITION
+        </footer>
+      </div>
+    );
+  }
+
+  // SCREEN 3: AUTHENTICATED STAFF DASHBOARD (Customized to Staff Profile)
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
       <div>
@@ -195,12 +390,12 @@ export default function MunicipalAdminDashboard() {
               MUNICIPAL DISPATCH OPERATIONS • TAYTAY, RIZAL
             </span>
           </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-amber-400 font-mono text-[11px] hidden sm:inline">
-              ARTA Turnaround Standard: 72h Max
+          <div className="flex items-center space-x-3 text-[11px]">
+            <span className="text-amber-400 font-bold hidden sm:inline">
+              👤 {currentUser.full_name} ({currentUser.department})
             </span>
-            <span className="bg-slate-800 px-2.5 py-0.5 rounded text-[10px] text-slate-300 font-semibold border border-slate-700">
-              Brgy. Desk & Municipal Routing
+            <span className="bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-800">
+              Official Badge Active
             </span>
           </div>
         </div>
@@ -232,15 +427,16 @@ export default function MunicipalAdminDashboard() {
               >
                 🔄 Refresh
               </button>
-              <a
-                href="/report"
-                className="text-xs font-bold text-slate-700 hover:text-blue-950 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-300 transition hidden sm:inline-block"
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-xs font-bold text-red-700 hover:bg-red-50 bg-white px-3 py-1.5 rounded-lg border border-red-300 transition"
               >
-                + Citizen View
-              </a>
+                🔒 Log Out
+              </button>
               <a
                 href="/"
-                className="text-xs font-bold text-slate-700 hover:text-blue-950 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-300 transition"
+                className="text-xs font-bold text-slate-700 hover:text-blue-950 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-300 transition hidden sm:inline-block"
               >
                 Portal Home
               </a>
@@ -657,7 +853,7 @@ export default function MunicipalAdminDashboard() {
 
       {/* Minimal Footer */}
       <footer className="bg-slate-950 text-slate-500 py-6 px-4 text-center text-xs border-t border-slate-800">
-        <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS • MUNICIPAL SUITE</p>
+        <p className="font-semibold text-slate-400">ALCMNTR GOVTECH SYSTEMS • MULTI-TENANT EDITION</p>
         <p className="text-[11px] mt-1">Authorized Official Dispatch Operations. All rights reserved.</p>
       </footer>
     </div>
